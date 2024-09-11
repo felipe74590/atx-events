@@ -1,5 +1,9 @@
+from datetime import datetime
+
 import requests
 from bs4 import BeautifulSoup
+
+from db_helper import add_events_to_db
 
 SOURCE = "https://do512.com"
 
@@ -19,17 +23,25 @@ def get_page(page):
 def gather_512_events_data(url):
     events_page = url
     event_divs, page_result = get_page(events_page)
+    events = []
     try:
         for event in event_divs:
             """Gather important data from events in Do512 pages"""
             event_details_links = SOURCE + event["data-permalink"]
-            category_types = event["class"][2]
+            category_types = event["class"][2][9:]
 
             title = event.find("span", class_="ds-listing-event-title-text").text.strip()
-            start_time = event.find("div", class_="ds-event-time dtstart").text.strip()
             event_date = event.find("meta", itemprop="startDate")["datetime"]
             venue_details = event.find("div", class_="ds-venue-name")
             venue_location = venue_details.find("span", itemprop="name").text.strip()
+            this_event = {
+                "title": title,
+                "category": category_types,
+                "venue": venue_location,
+                "link": event_details_links,
+                "start_datetime": event_date,
+            }
+            events.append(this_event)
 
         if page_result != None:
             next_page = page_result["href"]
@@ -37,11 +49,13 @@ def gather_512_events_data(url):
             gather_512_events_data(source)
         else:
             print("No next page")
-        return "Done"
+        return events
 
     except Exception as err:
         print("Error parsing and collecting basic event data", err)
 
 
-if __name__ == "main":
-    gather_512_events_data(SOURCE)
+if __name__ == "__main__":
+
+    data = gather_512_events_data(SOURCE)
+    add_events_to_db(data)
