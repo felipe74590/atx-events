@@ -5,57 +5,86 @@ from bs4 import BeautifulSoup
 
 from db_helper import add_events_to_db
 
-SOURCE = "https://do512.com"
+SOURCE1 = "https://do512.com"
+SOURCE2 = "https://heyaustin.com/austin-events/"
 
 
-def get_page(page):
+def get_page(page: str):
+    """
+    Gets html data for url page provided.
+    """
     try:
         this_page = requests.get(page)
         soup = BeautifulSoup(this_page.text, features="html.parser")
-        events_soup = soup.find_all("div", class_="ds-listing")
-        next_page = soup.find("a", class_="ds-next-page")
     except Exception as err:
         print("There was an error getting page", err)
-    return events_soup, next_page
+
+    return soup
 
 
-# Loop through each event and get basic event data
-def gather_512_events_data(url):
-    events_page = url
-    event_divs, page_result = get_page(events_page)
+def gather_512_events_data(url: str) -> list:
+    """
+    Gather important data from events in Do512 pages
+    :param url: the current url of the page being scraped
+    """
+    hot_soup = get_page(url)
+    events_soup = hot_soup.find_all("div", class_="ds-listing")
+    next_page = hot_soup.find("a", class_="ds-next-page")
+
     events = []
-    try:
-        for event in event_divs:
-            """Gather important data from events in Do512 pages"""
-            event_details_links = SOURCE + event["data-permalink"]
-            category_types = event["class"][2][9:]
+    for event in events_soup:
+        event_details_links = SOURCE1 + event["data-permalink"]
+        category_types = event["class"][2][9:]
 
-            title = event.find("span", class_="ds-listing-event-title-text").text.strip()
-            event_date = event.find("meta", itemprop="startDate")["datetime"]
-            venue_details = event.find("div", class_="ds-venue-name")
-            venue_location = venue_details.find("span", itemprop="name").text.strip()
-            this_event = {
-                "title": title,
-                "category": category_types,
-                "venue": venue_location,
-                "link": event_details_links,
-                "start_datetime": event_date,
-            }
-            events.append(this_event)
+        title = event.find("span", class_="ds-listing-event-title-text").text.strip()
+        event_date = event.find("meta", itemprop="startDate")["datetime"]
+        venue_details = event.find("div", class_="ds-venue-name")
+        venue_location = venue_details.find("span", itemprop="name").text.strip()
+        this_event = {
+            "title": title,
+            "category": category_types,
+            "venue": venue_location,
+            "link": event_details_links,
+            "start_datetime": event_date,
+        }
 
-        if page_result != None:
-            next_page = page_result["href"]
-            source = SOURCE + next_page
-            gather_512_events_data(source)
-        else:
-            print("No next page")
-        return events
+        events.append(this_event)
 
-    except Exception as err:
-        print("Error parsing and collecting basic event data", err)
+    if next_page != None:
+        next_page_url = next_page["href"]
+        source = SOURCE1 + next_page_url
+        gather_512_events_data(source)
+    else:
+        print("No next page")
+    return events
+
+
+
+def extract_details(details_url: str):
+    """
+    Extract all details from subpage
+    :param events_soup
+    """
+    hot_soup = get_page(details_url)
+    event_soup = hot_soup.find("div", class_="fbecol-8-12")
+    title = event_soup.h1.text.strip()
+    venue_details = hot_soup.find("div", class_="detail_items")
+    date = venue_details.div.span.text.strip()
+    ##TODO: Find out how to get the second div in venue_details which contains event start time and the third div in venue_details which contains venue name.
+
+
+def gather_events_data_hey_austin(url: str):
+    """
+    Gather important data from events in HeyAustin pages
+    :param url: the current url of the page being scraped
+    """
+    hot_soup = get_page(url)
+    events_soup = hot_soup.find_all("div", class_="fbe_col_title")
+    for event in events_soup:
+        event_details = extract_details(event.a["href"])
 
 
 if __name__ == "__main__":
-
-    data = gather_512_events_data(SOURCE)
-    add_events_to_db(data)
+    data = gather_events_data_hey_austin(SOURCE2)
+    # data = gather_512_events_data(SOURCE1)
+    # add_events_to_db(data)
