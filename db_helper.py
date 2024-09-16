@@ -32,8 +32,14 @@ def add_events_to_db(events):
                 )
             ).first()
 
-            if existing_event is not None:
-                new_event = Event(**event)
+            if existing_event is None:
+                new_event = Event(
+                    title=event.title,
+                    venue=event.venue,
+                    start_datetime=event.start_datetime,
+                    category=event.category,
+                    event_link=event.event_link
+                )
                 session.add(new_event)
                 events_added +=1
             else:

@@ -150,6 +150,6 @@ def gather_hey_austin_events_data(url: str, events_list=[]):
 
 
 if __name__ == "__main__":
-    data = gather_hey_austin_events_data(SOURCE2)
-    # data = gather_512_events_data(SOURCE1)
+    #data = gather_hey_austin_events_data(SOURCE2)
+    data = gather_512_events_data(SOURCE1)
     add_events_to_db(data)
