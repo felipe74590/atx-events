@@ -1,9 +1,9 @@
-import os
 from typing import Optional
 
+from decouple import config
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
-sqlite_file_name = os.environ["DATABASE"]
+sqlite_file_name = config("DATABASE")
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 
@@ -42,6 +42,7 @@ def add_events_to_db(events):
                 )
                 session.add(new_event)
                 events_added +=1
+
             else:
                 print(
                     f"This event {event.title} on {event.start_datetime} already exists in database"
