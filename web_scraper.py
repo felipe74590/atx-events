@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from typing import NamedTuple, Optional
 
@@ -8,6 +9,7 @@ from db_helper import add_events_to_db
 
 SOURCE1 = "https://do512.com"
 SOURCE2 = "https://heyaustin.com/austin-events/"
+SOURCE3 = "https://austin.culturemap.com/events/"
 INCOMPLETE_INFO = "Important event information is missing from event descriptions."
 
 headers = {
@@ -36,10 +38,10 @@ def get_page(page: str):
     return soup
 
 
-def gather_512_events_data(url: str, event_list=[]) -> list[Event]:
+def gather_events_data_source_1(url: str, event_list=[]) -> list[Event]:
     """
     Gather important data from events in Do512 pages
-    :param url: the current url of the page being scraped
+    :param url: url of page being scraped
     """
     hot_soup = get_page(url)
     events_soup = hot_soup.find_all("div", class_="ds-listing")
@@ -73,7 +75,7 @@ def gather_512_events_data(url: str, event_list=[]) -> list[Event]:
     if next_page is not None:
         next_page_url = next_page["href"]
         source = SOURCE1 + next_page_url
-        gather_512_events_data(source, events)
+        gather_events_data_source_1(source, events)
     else:
         print("No next page")
     return events
@@ -93,6 +95,7 @@ def extract_details(details_url: str) -> Event:
     # Sometimes the venue is in index 2 other times, index 2 is a link for tickets and index 3 has the venue name.
     # Sometimes venue is TBA
     if len(venue_details) != 4:
+        print(INCOMPLETE_INFO)
         return None
     else:
         date, time, venue_maybe, venue_maybe2 = [
@@ -124,10 +127,10 @@ def extract_details(details_url: str) -> Event:
     return event
 
 
-def gather_hey_austin_events_data(url: str, events_list=[]):
+def gather_events_data_source_2(url: str, events_list=[]) -> list[Event]:
     """
     Gather important data from events in HeyAustin pages
-    :param url: the current url of the page being scraped
+    :param url: url of page being scraped
     """
     events = events_list
     hot_soup = get_page(url)
@@ -143,13 +146,38 @@ def gather_hey_austin_events_data(url: str, events_list=[]):
     if next_page is not None:
         next_page_url = next_page["href"]
         source = next_page_url
-        gather_hey_austin_events_data(source, events)
+        gather_events_data_source_2(source, events)
     else:
         print("No next page")
     return events
 
 
+def gather_events_data_source_3(url: str, events_list=[]) -> list[Event]:
+    """
+    Gather important data from events in Austin culture map pages
+    :param url: url of page being scraped
+    """
+    hot_soup = get_page(url)
+    # print(hot_soup)
+    events_soup = hot_soup.find_all("div", class_="event-post")
+    print(events_soup)
+    # for event in events_soup:
+    #     title = event.find("div", class_="headline").text.strip()
+    #     print(title)
+
+
 if __name__ == "__main__":
-    # data = gather_hey_austin_events_data(SOURCE2)
-    data = gather_512_events_data(SOURCE1)
-    add_events_to_db(data)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--source", help="Enter source: source1, source2, source3")
+    args = parser.parse_args()
+
+    match args.source:
+        case "source1":
+            data = gather_events_data_source_1(SOURCE1)
+            add_events_to_db(data)
+        case "source2":
+            data = gather_events_data_source_2(SOURCE2)
+            add_events_to_db(data)
+        case "source3":
+            data = gather_events_data_source_3(SOURCE3)
+            add_events_to_db(data)

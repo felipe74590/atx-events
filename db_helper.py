@@ -1,4 +1,3 @@
-import os
 from typing import Optional
 
 from decouple import config
@@ -35,13 +34,9 @@ def add_events_to_db(events):
 
             if existing_event is None:
                 new_event = Event(
-                    title=event.title,
-                    venue=event.venue,
-                    start_datetime=event.start_datetime,
-                    category=event.category,
-                    event_link=event.event_link
+                    **event._asdict(),
                 )
-                session.add(event)
+                session.add(new_event)
                 events_added += 1
 
             else:
