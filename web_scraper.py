@@ -1,6 +1,6 @@
 import argparse
 from datetime import datetime
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 import requests
 from bs4 import BeautifulSoup
@@ -24,8 +24,8 @@ class Event(NamedTuple):
     title: str
     start_datetime: datetime
     venue: str
-    category: Optional[str] = None
-    event_link: Optional[str] = None
+    category: str | None
+    event_link: str | None
 
 
 def get_page(page: str):
@@ -38,7 +38,7 @@ def get_page(page: str):
     return soup
 
 
-def gather_events_data_source_1(url: str, event_list=[]) -> list[Event]:
+def gather_events_data_source_do512(url: str, events_list=None) -> list[Event]:
     """
     Gather important data from events in Do512 pages
     :param url: url of page being scraped
@@ -46,7 +46,9 @@ def gather_events_data_source_1(url: str, event_list=[]) -> list[Event]:
     hot_soup = get_page(url)
     events_soup = hot_soup.find_all("div", class_="ds-listing")
     next_page = hot_soup.find("a", class_="ds-next-page")
-    events = event_list
+    if events_list is None:
+        events_list = []
+    events = events_list
     for event in events_soup:
         event_details_links = SOURCE1 + event["data-permalink"]
         category_types = event["class"][2][9:]
@@ -75,7 +77,7 @@ def gather_events_data_source_1(url: str, event_list=[]) -> list[Event]:
     if next_page is not None:
         next_page_url = next_page["href"]
         source = SOURCE1 + next_page_url
-        gather_events_data_source_1(source, events)
+        gather_events_data_source_do512(source, events)
     else:
         print("No next page")
     return events
@@ -127,15 +129,18 @@ def extract_details(details_url: str) -> Event:
     return event
 
 
-def gather_events_data_source_2(url: str, events_list=[]) -> list[Event]:
+def gather_events_data_source_heyaustin(url: str, events_list=None) -> list[Event]:
     """
     Gather important data from events in HeyAustin pages
     :param url: url of page being scraped
     """
-    events = events_list
+    
     hot_soup = get_page(url)
     next_page = hot_soup.find("a", class_="next page-numbers")
     events_soup = hot_soup.find_all("div", class_="fbe_col_title")
+    if events_list is None:
+        events_list = []
+    events = events_list
     for event in events_soup:
         event_details = extract_details(event.a["href"])
         if event_details is not None:
@@ -146,13 +151,13 @@ def gather_events_data_source_2(url: str, events_list=[]) -> list[Event]:
     if next_page is not None:
         next_page_url = next_page["href"]
         source = next_page_url
-        gather_events_data_source_2(source, events)
+        gather_events_data_source_heyaustin(source, events)
     else:
         print("No next page")
     return events
 
 
-def gather_events_data_source_3(url: str, events_list=[]) -> list[Event]:
+def gather_events_data_source_atxmap(url: str, events_list=[]) -> list[Event]:
     """
     Gather important data from events in Austin culture map pages
     :param url: url of page being scraped
@@ -173,11 +178,13 @@ if __name__ == "__main__":
 
     match args.source:
         case "source1":
-            data = gather_events_data_source_1(SOURCE1)
+            data = gather_events_data_source_do512(SOURCE1)
             add_events_to_db(data)
         case "source2":
-            data = gather_events_data_source_2(SOURCE2)
+            data = gather_events_data_source_heyaustin(SOURCE2)
             add_events_to_db(data)
         case "source3":
-            data = gather_events_data_source_3(SOURCE3)
+            data = gather_events_data_source_atxmap(SOURCE3)
             add_events_to_db(data)
+        case _ :
+            print("Invalid input")
