@@ -1,4 +1,3 @@
-from typing import Optional
 
 from decouple import config
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -8,12 +7,12 @@ sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 
 class Event(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     title: str
     venue: str
     start_datetime: str
-    category: Optional[str] = None
-    event_link: Optional[str] = None
+    category: str | None = None
+    event_link: str | None = None
 
 
 engine = create_engine(sqlite_url)
