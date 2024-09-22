@@ -1,15 +1,15 @@
-import argparse
+
 from datetime import datetime
 from typing import NamedTuple
 
 import requests
 from bs4 import BeautifulSoup
+from decouple import config
 
-from db_helper import add_events_to_db
+source_one = config("SOURCE1")
+source_two = config("SOURCE2")
+source_three = config("SOURCE3")
 
-SOURCE1 = "https://do512.com"
-SOURCE2 = "https://heyaustin.com/austin-events/"
-SOURCE3 = "https://austin.culturemap.com/events/"
 INCOMPLETE_INFO = "Important event information is missing from event descriptions."
 
 headers = {
@@ -30,7 +30,7 @@ class Event(NamedTuple):
 
 def get_page(page: str):
     """Gets html data for url page provided."""
-    this_page = requests.get(page, headers=headers)
+    this_page = requests.get(page, headers=headers, timeout=10)
     this_page.raise_for_status()
     soup = BeautifulSoup(this_page.text, features="html.parser")
     return soup
@@ -48,7 +48,7 @@ def gather_events_data_source_do512(url: str, events_list=None) -> list[Event]:
         events_list = []
     events = events_list
     for event in events_soup:
-        event_details_links = SOURCE1 + event["data-permalink"]
+        event_details_links = source_one + event["data-permalink"]
         category_types = event["class"][2][9:]
 
         title = event.find("span", class_="ds-listing-event-title-text").text.strip()
@@ -74,7 +74,7 @@ def gather_events_data_source_do512(url: str, events_list=None) -> list[Event]:
 
     if next_page is not None:
         next_page_url = next_page["href"]
-        source = SOURCE1 + next_page_url
+        source = source_one + next_page_url
         gather_events_data_source_do512(source, events)
     else:
         print("No next page")
@@ -168,20 +168,4 @@ def gather_events_data_source_atxmap(url: str, events_list=None) -> list[Event]:
     #     print(title)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--source", help="Enter source: source1, source2, source3")
-    args = parser.parse_args()
 
-    match args.source:
-        case "source1":
-            data = gather_events_data_source_do512(SOURCE1)
-            add_events_to_db(data)
-        case "source2":
-            data = gather_events_data_source_heyaustin(SOURCE2)
-            add_events_to_db(data)
-        case "source3":
-            data = gather_events_data_source_atxmap(SOURCE3)
-            add_events_to_db(data)
-        case _ :
-            print("Invalid input")

@@ -1,4 +1,3 @@
-
 from decouple import config
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
