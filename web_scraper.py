@@ -1,10 +1,14 @@
 
 from datetime import datetime
 from typing import NamedTuple
+import feedparser
+import re
 
 import requests
 from bs4 import BeautifulSoup
 from decouple import config
+
+from playwright.sync_api import sync_playwright
 
 source_one = config("SOURCE1")
 source_two = config("SOURCE2")
@@ -40,6 +44,7 @@ def gather_events_data_source_do512(url: str, events_list=None) -> list[Event]:
     """
     Gather important data from events in Do512 pages.
     :param url: url of page being scraped.
+    :param events_list: ongoing list of events from this source
     """
     hot_soup = get_page(url)
     events_soup = hot_soup.find_all("div", class_="ds-listing")
@@ -128,6 +133,7 @@ def gather_events_data_source_heyaustin(url: str, events_list=None) -> list[Even
     """
     Gather important data from events in HeyAustin pages.
     :param url: url of page being scraped.
+    :param events_list: ongoing list of events from this source
     """
     hot_soup = get_page(url)
     next_page = hot_soup.find("a", class_="next page-numbers")
@@ -151,21 +157,64 @@ def gather_events_data_source_heyaustin(url: str, events_list=None) -> list[Even
     return events
 
 
-def gather_events_data_source_atxmap(url: str, events_list=None) -> list[Event]:
+def gather_events_data_source_atxorg(url: str, events_list=None) -> list[Event]:
     """
-    Gather important data from events in Austin culture map pages.
+    Gather important data from events in Austin Texas.org pages.
     :param url: url of page being scraped.
+    :param events_list: ongoing list of events from this source
     """
-    hot_soup = get_page(url)
-    # print(hot_soup)
-    # events_soup = hot_soup.find_all("div", class_="event-post")
-    # if events_list is None:
-    #     events_list = []
-    # events = events_list
-    # print(events_soup)
-    # for event in events_soup:
-    #     title = event.find("div", class_="headline").text.strip()
-    #     print(title)
+    #The following are the relevant data keys withing the feed entry
+    #dict_keys(['title', 'link', 'tags', 'summary', 'summary_detail'])
+    feed = feedparser.parse(url)
 
+    for entry in feed.entries:
+        print(entry.summary_detail)
+        # date_pattern = r'\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s\w+\s\d{1,2}(?:st|nd|rd|th)?|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2}(?:st|nd|rd|th)?'
+        # date_matches = re.findall(date_pattern, entry.summary)
+        # print(date_matches)
+        # address_pattern = r'\(\s*(.*?)\s*\)'
+        # address_matches = re.findall(address_pattern, entry.summary)
+        # print(address_matches)
+
+        # getting the event category from the tags
+        categories = ""
+        for tag in entry.tags:
+            categories += tag.term + " "
+        event = Event(
+            title=entry.title,
+            start_datetime="",
+            venue="",
+            category=categories,
+            event_link=entry.link
+        )
+
+##TODO:Inner_text() lacks
+def gather_events_data_atx_culture(url:str, events_list=None) -> list[Event]:
+    """
+    Gather important event data in Austin Culture map pages.
+    :param url: url of page being scraped.
+    :param events_list: ongoing list of events from this source
+    """
+    inner_html = None
+    soup = None
+    with sync_playwright() as p:
+        with p.chromium.launch(headless=True) as browser:
+            page = browser.new_page()
+            page.goto(url)
+            page.wait_for_selector('.grid-flow-row-dense')
+            element_handle = page.query_selector('div.grid-flow-row-dense')
+            inner_html = element_handle.inner_html()
+            soup = BeautifulSoup(inner_html, 'html.parser')
+            events = soup.find_all('a')
+        
+        #TODO: Solve issue that doesn't allow event.find('div', class_='headline') to work
+        # Same with event.find('div', _class='location')
+        # Issue with date, the current function only shows time, this data source might be inefficient
+            for event in events:
+                print(event.prettify())
+                event_link = event["href"]
+                location = event.find('div', _class='location')
+                print(location)
+                break
 
 

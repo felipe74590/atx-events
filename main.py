@@ -5,14 +5,16 @@ from decouple import config
 from db_helper import add_events_to_db
 from events_api import get_predict_api_events
 from web_scraper import (
-    gather_events_data_source_atxmap,
+    gather_events_data_source_atxorg,
     gather_events_data_source_do512,
     gather_events_data_source_heyaustin,
+    gather_events_data_atx_culture
 )
 
 source_one = config("SOURCE1")
 source_two = config("SOURCE2")
 source_three = config("SOURCE3")
+source_four = config("SOURCE4")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -25,10 +27,12 @@ if __name__ == "__main__":
         case "source2":
             data = gather_events_data_source_heyaustin(source_two)
         case "source3":
-            data = gather_events_data_source_atxmap(source_three)
+            data = gather_events_data_source_atxorg(source_three)
         case "source4":
+            data = gather_events_data_atx_culture(source_four)
+        case "source5":
             data = get_predict_api_events()
         case _ :
             print("Invalid input")
 
-    add_events_to_db(data)
+    # add_events_to_db(data)
