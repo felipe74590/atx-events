@@ -10,15 +10,54 @@ dependencies = [
     "requests>=2.32.3",
     "sqlmodel>=0.0.22",
 ]
-
-[tool.black]
-line-length = 90
-skip-magic-trailing-comma = false
-skip-string-normalization = false
-target-version = ['py310', 'py311', 'py312']
-
 [tool.uv]
 dev-dependencies = [
-    "black>=24.8.0",
-    "isort>=5.13.2",
+    "ruff>=0.6.6",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = 'py312'
+show-fixes = true
+
+exclude = [
+    ".git",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "site-packages",
+    "venv",
+]
+
+[tool.ruff.lint]
+extend-select = ["C4", "SIM", "TCH"]
+ignore =["D205","D401","D211","D212"]
+select = [
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "D",  # pydocstyle
+    "E",  # Error
+    "F",  # pyflakes
+    "I",  # isort
+    "N",  # pep8-naming
+    "PGH",  # pygrep-hooks
+    "PTH", # flake8-use-pathlib
+    "Q",  # flake8-quotes
+    "S",  # bandit
+    "SIM",  # flake8-simplify
+    "TRY",  # tryceratops
+    "UP",  # pyupgrade
+    "W",  # Warning
+    "YTT", # flake8-2020
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"
+docstring-code-format = true
+skip-magic-trailing-comma = false
+
