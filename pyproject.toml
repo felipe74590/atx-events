@@ -36,7 +36,7 @@ exclude = [
 
 [tool.ruff.lint]
 extend-select = ["C4", "SIM", "TCH"]
-ignore =["D205","D401","D211","D212", "D415","D400"]
+ignore =["D205","D401","D211","D212", "D415","D400","D100"]
 select = [
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
