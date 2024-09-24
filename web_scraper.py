@@ -1,18 +1,13 @@
-
+import time
 from datetime import datetime
 from typing import NamedTuple
-import feedparser
-import re
 
 import requests
 from bs4 import BeautifulSoup
-from decouple import config
 
 from playwright.sync_api import sync_playwright
 
-source_one = config("SOURCE1")
-source_two = config("SOURCE2")
-source_three = config("SOURCE3")
+from constants import source_one, source_two, source_three, source_four
 
 INCOMPLETE_INFO = "Important event information is missing from event descriptions."
 
@@ -160,61 +155,67 @@ def gather_events_data_source_heyaustin(url: str, events_list=None) -> list[Even
 def gather_events_data_source_atxorg(url: str, events_list=None) -> list[Event]:
     """
     Gather important data from events in Austin Texas.org pages.
-    :param url: url of page being scraped.
-    :param events_list: ongoing list of events from this source
+    :param url: url of page being scraped.  :param events_list: ongoing list of events from this source
     """
     #The following are the relevant data keys withing the feed entry
     #dict_keys(['title', 'link', 'tags', 'summary', 'summary_detail'])
-    feed = feedparser.parse(url)
+    with sync_playwright() as p:
+        with p.chromium.launch(headless=False) as browser:
+            page = browser.new_page()
+            page.goto(url)
+            breakpoint()
 
-    for entry in feed.entries:
-        print(entry.summary_detail)
-        # date_pattern = r'\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s\w+\s\d{1,2}(?:st|nd|rd|th)?|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2}(?:st|nd|rd|th)?'
-        # date_matches = re.findall(date_pattern, entry.summary)
-        # print(date_matches)
-        # address_pattern = r'\(\s*(.*?)\s*\)'
-        # address_matches = re.findall(address_pattern, entry.summary)
-        # print(address_matches)
+    # title, start_datetime, venue, category, event_link
 
-        # getting the event category from the tags
-        categories = ""
-        for tag in entry.tags:
-            categories += tag.term + " "
-        event = Event(
-            title=entry.title,
-            start_datetime="",
-            venue="",
-            category=categories,
-            event_link=entry.link
-        )
 
-##TODO:Inner_text() lacks
+def auto_scroll(page, max_scrolls=10):
+    # Scroll to the bottom of the page to trigger loading of all content
+    previous_height = page.evaluate("document.body.scrollHeight")
+
+    scrolls = 0
+    while True:
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(1)  # Wait for the new content to load
+        scrolls += 1
+
+        # Check if more content has loaded by comparing the page height
+        new_height = page.evaluate("document.body.scrollHeight")
+        if new_height == previous_height:
+            break
+        previous_height = new_height
+
+        if scrolls >= max_scrolls:
+            break
+
+
 def gather_events_data_atx_culture(url:str, events_list=None) -> list[Event]:
     """
     Gather important event data in Austin Culture map pages.
     :param url: url of page being scraped.
     :param events_list: ongoing list of events from this source
     """
-    inner_html = None
-    soup = None
     with sync_playwright() as p:
-        with p.chromium.launch(headless=True) as browser:
+        with p.chromium.launch(headless=False) as browser:
             page = browser.new_page()
             page.goto(url)
-            page.wait_for_selector('.grid-flow-row-dense')
-            element_handle = page.query_selector('div.grid-flow-row-dense')
-            inner_html = element_handle.inner_html()
-            soup = BeautifulSoup(inner_html, 'html.parser')
-            events = soup.find_all('a')
-        
-        #TODO: Solve issue that doesn't allow event.find('div', class_='headline') to work
-        # Same with event.find('div', _class='location')
-        # Issue with date, the current function only shows time, this data source might be inefficient
-            for event in events:
-                print(event.prettify())
-                event_link = event["href"]
-                location = event.find('div', _class='location')
-                print(location)
-                break
 
+            # if we want to load more content, but as we run it daily this
+            # might not be needed
+            # auto_scroll(page)
 
+            page.wait_for_selector("div.module-headline__text", timeout=10000)
+
+            event_dates = page.query_selector_all("div.module-headline__text")
+            event_grids = page.query_selector_all("div.grid-flow-row-dense")
+
+            event_dates = [event.inner_text() for event in event_dates]
+
+            for date, grid in zip(event_dates, event_grids):
+                print(f"=== {date} ===")
+                for event in grid.query_selector_all("div.event-post"):
+                    event = event.inner_text()
+                    fields = event.splitlines()
+                    if len(fields) == 4:  # get editor's pick off
+                        fields = fields[1:]
+                    title, venue, time = fields
+                    print(f"{title=} - {venue=} - {time=}")
