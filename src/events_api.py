@@ -4,7 +4,7 @@ from datetime import datetime
 import requests
 from decouple import config
 
-from web_scraper import Event
+from src.web_scraper import Event
 
 base_url = config("PREDICT_API")
 access_token = config("EVENTS_HQ_TOKEN")

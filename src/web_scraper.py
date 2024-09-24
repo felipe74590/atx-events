@@ -4,10 +4,9 @@ from typing import NamedTuple
 
 import requests
 from bs4 import BeautifulSoup
-
 from playwright.sync_api import sync_playwright
 
-from constants import source_one, source_two, source_three, source_four
+from src.constants import SOURCE_ONE
 
 INCOMPLETE_INFO = "Important event information is missing from event descriptions."
 
@@ -48,7 +47,7 @@ def gather_events_data_source_do512(url: str, events_list=None) -> list[Event]:
         events_list = []
     events = events_list
     for event in events_soup:
-        event_details_links = source_one + event["data-permalink"]
+        event_details_links = SOURCE_ONE + event["data-permalink"]
         category_types = event["class"][2][9:]
 
         title = event.find("span", class_="ds-listing-event-title-text").text.strip()
@@ -74,7 +73,7 @@ def gather_events_data_source_do512(url: str, events_list=None) -> list[Event]:
 
     if next_page is not None:
         next_page_url = next_page["href"]
-        source = source_one + next_page_url
+        source = SOURCE_ONE + next_page_url
         gather_events_data_source_do512(source, events)
     else:
         print("No next page")
@@ -155,7 +154,8 @@ def gather_events_data_source_heyaustin(url: str, events_list=None) -> list[Even
 def gather_events_data_source_atxorg(url: str, events_list=None) -> list[Event]:
     """
     Gather important data from events in Austin Texas.org pages.
-    :param url: url of page being scraped.  :param events_list: ongoing list of events from this source
+    :param url: url of page being scraped.  
+    :param events_list: ongoing list of events from this source
     """
     #The following are the relevant data keys withing the feed entry
     #dict_keys(['title', 'link', 'tags', 'summary', 'summary_detail'])
@@ -163,7 +163,11 @@ def gather_events_data_source_atxorg(url: str, events_list=None) -> list[Event]:
         with p.chromium.launch(headless=False) as browser:
             page = browser.new_page()
             page.goto(url)
-            breakpoint()
+            for event in page.query_selector_all("div.contents"):
+                i = event.inner_text()
+                print(i)
+
+            # breakpoint()
 
     # title, start_datetime, venue, category, event_link
 
@@ -188,12 +192,13 @@ def auto_scroll(page, max_scrolls=10):
             break
 
 
-def gather_events_data_atx_culture(url:str, events_list=None) -> list[Event]:
+def gather_events_data_atx_culture(url:str) -> list[Event]:
     """
     Gather important event data in Austin Culture map pages.
     :param url: url of page being scraped.
     :param events_list: ongoing list of events from this source
     """
+    events = []
     with sync_playwright() as p:
         with p.chromium.launch(headless=False) as browser:
             page = browser.new_page()
@@ -201,7 +206,7 @@ def gather_events_data_atx_culture(url:str, events_list=None) -> list[Event]:
 
             # if we want to load more content, but as we run it daily this
             # might not be needed
-            # auto_scroll(page)
+            auto_scroll(page)
 
             page.wait_for_selector("div.module-headline__text", timeout=10000)
 
@@ -210,12 +215,28 @@ def gather_events_data_atx_culture(url:str, events_list=None) -> list[Event]:
 
             event_dates = [event.inner_text() for event in event_dates]
 
-            for date, grid in zip(event_dates, event_grids):
-                print(f"=== {date} ===")
+            for date, grid in zip(event_dates, event_grids, strict=False):
+                for link in grid.query_selector_all("a"):
+                    if link.get_attribute("href")!= None:
+                        event_link = link.get_attribute("href")
+
+                date_only = date.split("\n")
+
                 for event in grid.query_selector_all("div.event-post"):
                     event = event.inner_text()
                     fields = event.splitlines()
+                    if len(fields) < 3:
+                        print("Missing event data: ", fields)
+                        continue
                     if len(fields) == 4:  # get editor's pick off
                         fields = fields[1:]
+
                     title, venue, time = fields
-                    print(f"{title=} - {venue=} - {time=}")
+                    date_object = f"{date_only[1].strip()} {time}"
+                    start_time = datetime.strptime(date_object,"%B %d, %Y %I:%M %p")
+                    events.append(
+                        Event(title=title, start_datetime=start_time, venue=venue, category=None, event_link=event_link)
+                    )
+
+    return events
+

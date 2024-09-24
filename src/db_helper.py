@@ -2,7 +2,7 @@ from decouple import config
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 sqlite_file_name = config("DATABASE")
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+sqlite_url = sqlite_file_name
 
 
 class Event(SQLModel, table=True):
