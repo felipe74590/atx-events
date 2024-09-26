@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 from src.constants import SOURCE_ONE
 
 INCOMPLETE_INFO = "Important event information is missing from event descriptions."
+HEADLESS = False
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.79 Safari/537.36",
@@ -159,7 +160,7 @@ def gather_events_data_source_atxorg(url: str, events_list=None) -> list[Event]:
     """
     #The following are the relevant data keys withing the feed entry
     #dict_keys(['title', 'link', 'tags', 'summary', 'summary_detail'])
-    with sync_playwright() as p, p.chromium.launch(headless=False) as browser:
+    with sync_playwright() as p, p.chromium.launch(headless=HEADLESS) as browser:
         page = browser.new_page()
         page.goto(url)
         for event in page.query_selector_all("div.contents"):
@@ -203,44 +204,44 @@ def gather_events_data_atx_culture(url:str) -> list[Event]:
     :param events_list: ongoing list of events from this source
     """
     events = []
-    with sync_playwright() as p, p.chromium.launch(headless=False) as browser:
-        # with p.chromium.launch(headless=False) as browser:
-        page = browser.new_page()
-        page.goto(url)
+    with sync_playwright() as p:
+        with p.chromium.launch(headless=HEADLESS) as browser:
+            page = browser.new_page()
+            page.goto(url)
 
-        # if we want to load more content, but as we run it daily this
-        # might not be needed
-        auto_scroll(page)
+            # if we want to load more content, but as we run it daily this
+            # might not be needed
+            auto_scroll(page)
 
-        page.wait_for_selector("div.module-headline__text", timeout=10000)
+            page.wait_for_selector("div.module-headline__text", timeout=10000)
 
-        event_dates = page.query_selector_all("div.module-headline__text")
-        event_grids = page.query_selector_all("div.grid-flow-row-dense")
+            event_dates = page.query_selector_all("div.module-headline__text")
+            event_grids = page.query_selector_all("div.grid-flow-row-dense")
 
-        event_dates = [event.inner_text() for event in event_dates]
+            event_dates = [event.inner_text() for event in event_dates]
 
-        for date, grid in zip(event_dates, event_grids, strict=False):
-            for link in grid.query_selector_all("a"):
-                if link.get_attribute("href") is not None:
-                    event_link = link.get_attribute("href")
+            for date, grid in zip(event_dates, event_grids, strict=False):
+                for link in grid.query_selector_all("a"):
+                    if link.get_attribute("href") is not None:
+                        event_link = link.get_attribute("href")
 
-            date_only = date.split("\n")
+                date_only = date.splitlines()
 
-            for event in grid.query_selector_all("div.event-post"):
-                event = event.inner_text()
-                fields = event.splitlines()
-                if len(fields) < 3:
-                    print("Missing event data: ", fields)
-                    continue
-                if len(fields) == 4:  # get editor's pick off
-                    fields = fields[1:]
+                for event in grid.query_selector_all("div.event-post"):
+                    event = event.inner_text()
+                    fields = event.splitlines()
+                    if len(fields) < 3:
+                        print("Missing event data: ", fields)
+                        continue
+                    if len(fields) == 4:  # get editor's pick off
+                        fields = fields[1:]
 
-                title, venue, time = fields
-                date_object = f"{date_only[1].strip()} {time}"
-                start_time = datetime.strptime(date_object,"%B %d, %Y %I:%M %p")
-                events.append(
-                    Event(title=title, start_datetime=start_time, venue=venue, category=None, event_link=event_link)
-                )
+                    title, venue, time = fields
+                    date_object = f"{date_only[1].strip()} {time}"
+                    start_time = datetime.strptime(date_object,"%B %d, %Y %I:%M %p")
+                    events.append(
+                        Event(title=title, start_datetime=start_time, venue=venue, category=None, event_link=event_link)
+                    )
 
     return events
 

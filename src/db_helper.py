@@ -2,7 +2,7 @@ from decouple import config
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 sqlite_file_name = config("DATABASE")
-sqlite_url = sqlite_file_name
+
 
 
 class Event(SQLModel, table=True):
@@ -14,7 +14,7 @@ class Event(SQLModel, table=True):
     event_link: str | None = None
 
 
-engine = create_engine(sqlite_url)
+engine = create_engine(sqlite_file_name)
 SQLModel.metadata.create_all(engine)
 
 
