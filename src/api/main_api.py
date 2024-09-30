@@ -8,22 +8,21 @@ from src.data.db_models import Event
 
 app = FastAPI()
 
-DATABASE_URL = config("LITE_DATABASE")
+DATABASE_URL = config("PSQL_DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 SQLModel.metadata.create_all(engine)
 
 
-@app.get("/events/", response_model=list[Event])
-def read_events(
-	skip: int = 0,
-	limit: int = 50,
+@app.get("/search_events/", response_model=list[Event])
+def search_events(
 	from_date: Optional[datetime] = None,
 	to_date: Optional[datetime] = None,
 	venue_keyword: Optional[str] = None,
+	category_keyword: Optional[str] = None,
 ):
 	"""
-	Get a list of events.
+	Get a list of events based on specified search.
 	- **limit**: Maximum number of records to return.
 	- **from_date**: Filter events starting on this date
 	- **to_date**: Filter events till this date
@@ -39,7 +38,24 @@ def read_events(
 		# Will need improvement or seperate search call to get events by key words
 		if venue_keyword:
 			statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
+		if category_keyword:
+			statement = statement.where(Event.category.ilike(f"%{category_keyword}%"))
 
+		events = session.exec(statement).all()
+		return events
+
+
+@app.get("/events/", response_model=list[Event])
+def read_events(
+	skip: int = 0,
+	limit: int = 50,
+):
+	"""
+	Get all events.
+	- **limit**: Maximum number of records to return.
+	- **skip**: Amount of events skipped, query will pull the next 50 if available
+	"""
+	with Session(engine) as session:
 		statement = select(Event).offset(skip).limit(limit)
 		events = session.exec(statement).all()
 		return events
