@@ -1,20 +1,45 @@
 from decouple import config
 from fastapi import FastAPI, HTTPException
 from sqlmodel import Session, SQLModel, create_engine, select
+from typing import Optional
+from datetime import datetime
 
-from data.db_helper import Event
+from src.data.db_models import Event
 
 app = FastAPI()
 
-DATABASE_URL = config("DATABASE")
+DATABASE_URL = config("LITE_DATABASE")
 engine = create_engine(DATABASE_URL)
 
 SQLModel.metadata.create_all(engine)
 
 
 @app.get("/events/", response_model=list[Event])
-def read_events(skip: int = 0, limit: int = 20):
+def read_events(
+	skip: int = 0,
+	limit: int = 50,
+	from_date: Optional[datetime] = None,
+	to_date: Optional[datetime] = None,
+	venue_keyword: Optional[str] = None,
+):
+	"""
+	Get a list of events.
+	- **limit**: Maximum number of records to return.
+	- **from_date**: Filter events starting on this date
+	- **to_date**: Filter events till this date
+	- **venue_keyword**: Search for events in the venue name.
+	"""
 	with Session(engine) as session:
+		statement = select(Event)
+
+		if from_date:
+			statement = statement.where(Event.start_datetime >= from_date)
+		if to_date:
+			statement = statement.where(Event.start_datetime <= to_date)
+		# Will need improvement or seperate search call to get events by key words
+		if venue_keyword:
+			statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
+
 		statement = select(Event).offset(skip).limit(limit)
 		events = session.exec(statement).all()
 		return events
@@ -38,17 +63,19 @@ def read_event(event_id: int):
 	return event
 
 
-@app.put("/events/{event_id}", response_model=Event)
+@app.patch("/events/{event_id}", response_model=Event)
 def update_event(event_id: int, event: Event):
 	with Session(engine) as session:
 		db_event = session.get(Event, event_id)
 		if not db_event:
 			raise HTTPException(status_code=404, detail="Event not found")
+		event_data = event.model_dump(exclude_uset=True)
+		db_event.sqlmodel_update(event_data)
 		event.id = event_id
-		session.merge(event)
+		session.add(db_event)
 		session.commit()
-		session.refresh(event)
-	return event
+		session.refresh(db_event)
+	return db_event
 
 
 @app.delete("/events/{event_id}", response_model=Event)
@@ -60,4 +87,3 @@ def delete_event(event_id: int):
 		session.delete(event)
 		session.commit()
 	return event
-
