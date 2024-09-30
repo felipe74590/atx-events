@@ -31,14 +31,14 @@ def search_events(
 	with Session(engine) as session:
 		statement = select(Event)
 
-		if from_date:
+		if from_date is not None:
 			statement = statement.where(Event.start_datetime >= from_date)
-		if to_date:
+		if to_date is not None:
 			statement = statement.where(Event.start_datetime <= to_date)
 		# Will need improvement or seperate search call to get events by key words
-		if venue_keyword:
+		if venue_keyword is not None:
 			statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
-		if category_keyword:
+		if category_keyword is not None:
 			statement = statement.where(Event.category.ilike(f"%{category_keyword}%"))
 
 		events = session.exec(statement).all()
