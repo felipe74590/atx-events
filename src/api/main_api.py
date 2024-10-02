@@ -1,7 +1,6 @@
 from decouple import config
 from fastapi import FastAPI, HTTPException
 from sqlmodel import Session, SQLModel, create_engine, select
-from typing import Optional
 from datetime import datetime
 
 from src.data.db_models import Event
@@ -16,10 +15,10 @@ SQLModel.metadata.create_all(engine)
 
 @app.get("/search_events/", response_model=list[Event])
 def search_events(
-	from_date: Optional[datetime] = None,
-	to_date: Optional[datetime] = None,
-	venue_keyword: Optional[str] = None,
-	category_keyword: Optional[str] = None,
+	from_date: datetime | None = None,
+	to_date: datetime | None = None,
+	venue_keyword: str | None = None,
+	category_keyword: str | None = None,
 ):
 	"""
 	Get a list of events based on specified search.
@@ -61,21 +60,21 @@ def read_events(
 		return events
 
 
-@app.post("/events/", response_model=Event)
-def create_event(event: Event):
-	with Session(engine) as session:
-		session.add(event)
-		session.commit()
-		session.refresh(event)
-	return event
-
-
 @app.get("/events/{event_id}", response_model=Event)
 def read_event(event_id: int):
 	with Session(engine) as session:
 		event = session.get(Event, event_id)
 		if not event:
 			raise HTTPException(status_code=404, detail="Event not found")
+	return event
+
+
+@app.post("/events/", response_model=Event)
+def create_event(event: Event):
+	with Session(engine) as session:
+		session.add(event)
+		session.commit()
+		session.refresh(event)
 	return event
 
 
