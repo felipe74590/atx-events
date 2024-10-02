@@ -6,6 +6,8 @@ from sqlmodel import SQLModel
 from alembic import context
 from decouple import config
 
+from src.data.db_models import User, Event, UserEventsAttended, UserEventsSaved
+
 
 DATABASE_URL = config("PSQL_DATABASE_URL")
 
