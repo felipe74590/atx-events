@@ -1,5 +1,6 @@
 from sqlmodel import Field, SQLModel, Relationship
 from typing import List
+from datetime import datetime
 
 
 class UserEventsAttended(SQLModel, table=True):
@@ -16,7 +17,7 @@ class Event(SQLModel, table=True):
 	id: int | None = Field(default=None, primary_key=True)
 	title: str
 	venue: str
-	start_datetime: str
+	start_datetime: datetime
 	category: str | None = None
 	event_link: str | None = None
 	attendees: List["User"] = Relationship(back_populates="events_attended", link_model=UserEventsAttended)

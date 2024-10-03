@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from sqlmodel import Session, SQLModel, create_engine, select
 from datetime import datetime
 
-from src.data.db_models import Event
+from src.data.db_models import Event, User
 
 app = FastAPI()
 
@@ -19,7 +19,7 @@ def search_events(
 	to_date: datetime | None = None,
 	venue_keyword: str | None = None,
 	category_keyword: str | None = None,
-):
+) -> list[Event]:
 	"""
 	Get a list of events based on specified search.
 	- **limit**: Maximum number of records to return.
@@ -34,7 +34,7 @@ def search_events(
 			statement = statement.where(Event.start_datetime >= from_date)
 		if to_date is not None:
 			statement = statement.where(Event.start_datetime <= to_date)
-		# Will need improvement or seperate search call to get events by key words
+
 		if venue_keyword is not None:
 			statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
 		if category_keyword is not None:
@@ -48,7 +48,7 @@ def search_events(
 def read_events(
 	skip: int = 0,
 	limit: int = 50,
-):
+) -> list[Event]:
 	"""
 	Get all events.
 	- **limit**: Maximum number of records to return.
@@ -61,7 +61,7 @@ def read_events(
 
 
 @app.get("/events/{event_id}", response_model=Event)
-def read_event(event_id: int):
+def read_event(event_id: int) -> Event:
 	with Session(engine) as session:
 		event = session.get(Event, event_id)
 		if not event:
@@ -70,7 +70,7 @@ def read_event(event_id: int):
 
 
 @app.post("/events/", response_model=Event)
-def create_event(event: Event):
+def create_event(event: Event) -> Event:
 	with Session(engine) as session:
 		session.add(event)
 		session.commit()
@@ -79,7 +79,7 @@ def create_event(event: Event):
 
 
 @app.patch("/events/{event_id}", response_model=Event)
-def update_event(event_id: int, event: Event):
+def update_event(event_id: int, event: Event) -> Event:
 	with Session(engine) as session:
 		db_event = session.get(Event, event_id)
 		if not db_event:
@@ -102,3 +102,34 @@ def delete_event(event_id: int):
 		session.delete(event)
 		session.commit()
 	return event
+
+
+@app.post("/users/", response_model=User)
+def create_user(user: User) -> User:
+	with Session(engine) as session:
+		session.add(user)
+		session.commit()
+		session.refresh(user)
+	return user
+
+
+@app.get("/user/", response_model=User)
+def get_user(user_name) -> User:
+	with Session(engine) as session:
+		user = session.get(User, user_name)
+		if not user:
+			raise HTTPException(status_code=404, detail=f"User {user_name} not found")
+	return user
+
+
+@app.get("/users/", response_model=list[User])
+def get_users(skip: int = 0, limit: int = 50) -> list[User]:
+	"""
+	Get all users.
+	- **limit**: Maximum number of records to return.
+	    - **skip**: Amount of events skipped, query will pull the next 50 if available
+	"""
+	with Session(engine) as session:
+		statement = select(User).offset(skip).limit(limit)
+		users = session.exec(statement).all()
+		return users
