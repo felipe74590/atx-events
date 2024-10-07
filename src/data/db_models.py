@@ -35,3 +35,16 @@ class User(UserBase, table=True):
 	active: bool = True
 	events_attended: List[Event] = Relationship(back_populates="attendees", link_model=UserEventsAttended)
 	events_saved: List[Event] = Relationship(back_populates="saved_by", link_model=UserEventsSaved)
+
+
+class Token(SQLModel):
+	access_token: str
+	token_type: str
+
+
+class TokenData(SQLModel):
+	username: str | None = None
+
+
+class UserInDB(UserBase):
+	hashed_password: str
