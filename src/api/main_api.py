@@ -1,9 +1,16 @@
 from decouple import config
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, SQLModel, create_engine, select
-from datetime import datetime
+from datetime import datetime, timedelta
+from src.data.db_helper import (
+	ACCESS_TOKEN_EXPIRE_MINUTES,
+	authenticate_user,
+	create_access_token,
+	get_current_active_user,
+)
 
-from src.data.db_models import Event, User
+from src.data.db_models import Event, User, Token, UserEventsAttended, UserEventsSaved
 
 app = FastAPI()
 
@@ -11,6 +18,37 @@ DATABASE_URL = config("PSQL_DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 SQLModel.metadata.create_all(engine)
+
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+	with Session(engine) as session:
+		user = authenticate_user(session, form_data.username, form_data.password)
+		if not user:
+			raise HTTPException(
+				status_code=status.HTTP_401_UNAUTHORIZED,
+				detail="Incorrect username or password",
+				headers={"WWW-Authenticate": "Bearer"},
+			)
+		access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+		access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+		return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/users/me/events/attended", response_model=User)
+def get_attended_events(current_user: User = Depends(get_current_active_user)):
+	with Session(engine) as session:
+		query = select(Event).join(UserEventsAttended).where(UserEventsAttended.user_id == current_user.id)
+		events = session.exec(query).all
+		return events
+
+
+@app.get("/users/me/events/saved", response_model=User)
+def get_saved_events(current_user: User = Depends(get_current_active_user)):
+	with Session(engine) as session:
+		query = select(Event).join(UserEventsSaved).where(UserEventsSaved.user_id == current_user.id)
+		events = session.exec(query).all
+		return events
 
 
 @app.get("/search_events/", response_model=list[Event])
@@ -113,12 +151,12 @@ def create_user(user: User) -> User:
 	return user
 
 
-@app.get("/user/", response_model=User)
-def get_user(user_name) -> User:
+@app.get("/user/{user_id}", response_model=User)
+def get_user(user: User) -> User:
 	with Session(engine) as session:
-		user = session.get(User, user_name)
+		user = session.get(User, user.id)
 		if not user:
-			raise HTTPException(status_code=404, detail=f"User {user_name} not found")
+			raise HTTPException(status_code=404, detail=f"User id {user.id} with username {user.user_name} not found")
 	return user
 
 
