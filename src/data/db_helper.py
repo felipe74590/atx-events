@@ -8,15 +8,15 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-db_url = config("PSQL_DATABASE_URL")
+DATABASE_URL = config("DATABASE_URL")
 
 DEBUG = config("DEBUG", default=False, cast=bool)
 
 # heroku does not let me set the DATABASE_URL with the postgresql:// scheme
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(db_url)
+engine = create_engine(DATABASE_URL)
 SQLModel.metadata.create_all(engine)
 
 

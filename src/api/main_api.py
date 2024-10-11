@@ -15,6 +15,9 @@ from src.data.db_models import Event, User, Token, UserEventsAttended, UserEvent
 app = FastAPI()
 
 DATABASE_URL = config("PSQL_DATABASE_URL")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(DATABASE_URL)
 
 SQLModel.metadata.create_all(engine)
