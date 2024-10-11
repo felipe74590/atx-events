@@ -1,6 +1,6 @@
-from decouple import config
 from sqlmodel import Session, SQLModel, create_engine, select
 from src.data.db_models import Event, UserInDB, User, TokenData
+from src.constants import DATABASE_URL
 from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -8,14 +8,6 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-
-DATABASE_URL = config("DATABASE_URL")
-
-DEBUG = config("DEBUG", default=False, cast=bool)
-
-# heroku does not let me set the DATABASE_URL with the postgresql:// scheme
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL)
 SQLModel.metadata.create_all(engine)

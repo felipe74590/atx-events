@@ -1,4 +1,3 @@
-from decouple import config
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -9,14 +8,11 @@ from src.data.db_helper import (
     create_access_token,
     get_current_active_user,
 )
+from src.constants import DATABASE_URL
 
 from src.data.db_models import Event, User, Token, UserEventsAttended, UserEventsSaved
 
 app = FastAPI()
-
-DATABASE_URL = config("DATABASE_URL")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL)
 

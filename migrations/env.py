@@ -4,12 +4,10 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlmodel import SQLModel
 from alembic import context
-from decouple import config
+from src.constants import DATABASE_URL
 
 from src.data.db_models import User, Event, UserEventsAttended, UserEventsSaved, UserInDB, Token, TokenData
 
-
-DATABASE_URL = config("DATABASE_URL")
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
