@@ -14,7 +14,7 @@ from src.data.db_models import Event, User, Token, UserEventsAttended, UserEvent
 
 app = FastAPI()
 
-DATABASE_URL = config("PSQL_DATABASE_URL")
+DATABASE_URL = config("DATABASE_URL")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
