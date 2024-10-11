@@ -10,6 +10,12 @@ from passlib.context import CryptContext
 
 db_url = config("PSQL_DATABASE_URL")
 
+DEBUG = config("DEBUG", default=False, cast=bool)
+
+# heroku does not let me set the DATABASE_URL with the postgresql:// scheme
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(db_url)
 SQLModel.metadata.create_all(engine)
 
