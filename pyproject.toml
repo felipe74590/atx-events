@@ -1,0 +1,54 @@
+[project]
+name = "atx-events"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13.3",
+    "beautifulsoup4>=4.12.3",
+    "fastapi[standard]>=0.115.0",
+    "passlib[bcrypt]>=1.7.4",
+    "playwright>=1.47.0",
+    "pre-commit>=3.8.0",
+    "pyjwt>=2.9.0",
+    "python-decouple>=3.8",
+    "python-jose>=3.3.0",
+    "python-multipart>=0.0.10",
+    "requests>=2.32.3",
+    "sqlalchemy>=2.0.34",
+    "sqlmodel>=0.0.22",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pgcli>=4.1.0",
+    "psycopg2-binary>=2.9.9",
+    "ruff>=0.6.6",
+]
+
+
+[tool.ruff]
+line-length = 120
+target-version = 'py312'
+show-fixes = true
+
+exclude = [
+    ".git",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "site-packages",
+    "venv",
+]
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+ignore =["D205","D401","D211","D212", "F401"]
