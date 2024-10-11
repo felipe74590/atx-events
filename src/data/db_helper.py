@@ -8,6 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+
 DATABASE_URL = config("DATABASE_URL")
 
 DEBUG = config("DEBUG", default=False, cast=bool)
