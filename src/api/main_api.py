@@ -38,7 +38,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 @app.get("/users/me/events/attended", response_model=User)
 def get_attended_events(current_user: User = Depends(get_current_active_user)):
     with Session(engine) as session:
-        query = select(Event).join(UserEventsAttended).where(UserEventsAttended.user_id == current_user.id)
+        query = select(Event).where(UserEventsAttended.user_id == current_user.id)
         events = session.exec(query).all
         return events
 
@@ -46,9 +46,18 @@ def get_attended_events(current_user: User = Depends(get_current_active_user)):
 @app.get("/users/me/events/saved", response_model=User)
 def get_saved_events(current_user: User = Depends(get_current_active_user)):
     with Session(engine) as session:
-        query = select(Event).join(UserEventsSaved).where(UserEventsSaved.user_id == current_user.id)
+        query = select(Event).where(UserEventsSaved.user_id == current_user.id)
         events = session.exec(query).all
         return events
+
+
+@app.get("/users/me/{user_id}", response_model=User)
+def get_me(user: User = Depends(get_current_active_user)) -> User:
+    with Session(engine) as session:
+        user = session.get(User, user.id)
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User id {user.id} with username {user.user_name} not found")
+    return user
 
 
 @app.get("/search_events/", response_model=list[Event])
