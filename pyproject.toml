@@ -47,6 +47,8 @@ exclude = [
 ]
 [tool.ruff.format]
 quote-style = "double"
-indent-style = "tab"
 docstring-code-format = true
 skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+ignore =["D205","D401","D211","D212", "F401"]
