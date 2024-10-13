@@ -50,12 +50,14 @@ def get_saved_events(current_user: User = Depends(get_current_active_user)):
         return events
 
 
-@app.get("/users/me/{user_id}", response_model=User)
+@app.get("/users/me/", response_model=User)
 def get_me(user: User = Depends(get_current_active_user)) -> User:
     with Session(engine) as session:
-        user = session.get(User, user.id)
+        user = session.get(User, user.user_name)
         if not user:
-            raise HTTPException(status_code=404, detail=f"User id {user.id} with username {user.user_name} not found")
+            raise HTTPException(
+                status_code=404, detail=f"User email {user.email} with username {user.user_name} not found"
+            )
     return user
 
 
@@ -153,9 +155,13 @@ def delete_event(event_id: int):
 @app.post("/users/", response_model=User)
 def create_user(user: User) -> User:
     with Session(engine) as session:
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+        existing_user = session.exec(
+            select(User).where(User.user_name == user.user_name, User.email == user.email)
+        ).first()
+        if existing_user is None:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
     return user
 
 
