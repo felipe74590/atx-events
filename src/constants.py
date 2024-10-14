@@ -11,3 +11,9 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 SECRET_KEY = config("SECRET_KEY")
+
+EVENTS_API_URL = "https://atx-events-api-7423eb0d8c65.herokuapp.com/"
+MAX_EVENTS_LIMIT = 50
+
+PREDICT_API = config("PREDICT_API")
+ACCESS_TOKEN = config("EVENTS_HQ_TOKEN")

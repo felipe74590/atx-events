@@ -5,10 +5,10 @@ import requests
 from decouple import config
 
 from src.web_scrapping.web_scraper import Event
+from src.constants import MAX_EVENTS_LIMIT
 
 base_url = config("PREDICT_API")
 access_token = config("EVENTS_HQ_TOKEN")
-MAX_EVENTS_LIMIT = 50
 
 
 def get_events(offset) -> dict:
