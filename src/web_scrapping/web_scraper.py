@@ -5,6 +5,7 @@ from typing import NamedTuple
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.constants import SOURCE_ONE
 
@@ -27,6 +28,7 @@ class Event(NamedTuple):
     event_link: str | None
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5))
 def get_page(page: str):
     """Gets html data for url page provided."""
     this_page = requests.get(page, headers=headers, timeout=10)

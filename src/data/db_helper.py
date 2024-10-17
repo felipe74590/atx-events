@@ -1,6 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine, select
 from src.data.db_models import Event, UserInDB, User, TokenData
-from src.constants import DATABASE_URL
+from src.constants import DATABASE_URL, SECRET_KEY
 from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -19,7 +19,6 @@ def get_session():
 
 
 ### AUTHENTICATION
-SECRET_KEY = ""
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

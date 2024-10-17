@@ -50,12 +50,14 @@ def get_saved_events(current_user: User = Depends(get_current_active_user)):
         return events
 
 
-@app.get("/users/me/{user_id}", response_model=User)
+@app.get("/users/me/", response_model=User)
 def get_me(user: User = Depends(get_current_active_user)) -> User:
     with Session(engine) as session:
-        user = session.get(User, user.id)
+        user = session.get(User, user.user_name)
         if not user:
-            raise HTTPException(status_code=404, detail=f"User id {user.id} with username {user.user_name} not found")
+            raise HTTPException(
+                status_code=404, detail=f"User email {user.email} with username {user.user_name} not found"
+            )
     return user
 
 
@@ -73,18 +75,28 @@ def search_events(
     - **to_date**: Filter events till this date
     - **venue_keyword**: Search for events in the venue name.
     """
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=400, detail="from_date must be before to_date")
+    elif not from_date and to_date:
+        raise HTTPException(status_code=400, detail="must provide a from_date if to_date is provided.")
+
     with Session(engine) as session:
         statement = select(Event)
 
+        # Build the query filters
+        filters = []
         if from_date is not None:
-            statement = statement.where(Event.start_datetime >= from_date)
+            filters.append(Event.start_datetime >= from_date)
         if to_date is not None:
-            statement = statement.where(Event.start_datetime <= to_date)
-
+            filters.append(Event.start_datetime <= to_date)
         if venue_keyword is not None:
-            statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
+            filters.append(Event.venue.ilike(f"%{venue_keyword}%"))
         if category_keyword is not None:
-            statement = statement.where(Event.category.ilike(f"%{category_keyword}%"))
+            filters.append(Event.category.ilike(f"%{category_keyword}%"))
+
+        # Apply filters to the statement if there are any
+        if filters:
+            statement = statement.where(*filters)
 
         events = session.exec(statement).all()
         return events
@@ -153,9 +165,15 @@ def delete_event(event_id: int):
 @app.post("/users/", response_model=User)
 def create_user(user: User) -> User:
     with Session(engine) as session:
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+        existing_user = session.exec(
+            select(User).where(User.user_name == user.user_name, User.email == user.email)
+        ).first()
+        if existing_user is None:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+        else:
+            raise HTTPException(status_code=409, detail="User already exists.")
     return user
 
 

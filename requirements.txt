@@ -55,6 +55,7 @@ soupsieve==2.6
 sqlalchemy==2.0.34
 sqlmodel==0.0.22
 starlette==0.38.6
+tenacity==9.0.0
 typer==0.12.5
 typing-extensions==4.12.2
 urllib3==2.2.3
