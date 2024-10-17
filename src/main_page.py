@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime
+from operator import itemgetter
 from constants import EVENTS_API_URL, MAX_EVENTS_LIMIT
 
 
@@ -9,7 +10,7 @@ st.title("Events in Austin Texas")
 st.write("Here are some upcoming events:")
 
 
-def load_events(current_count=0, data=None):
+def get_events(current_count=0, data=None) -> list:
     """Loads events based on todays date"""
     if not data:
         data = []
@@ -21,12 +22,27 @@ def load_events(current_count=0, data=None):
     if len(response.json()) >= MAX_EVENTS_LIMIT:
         current_count += 50
         data.extend(response.json())
-        load_events(current_count, data)
+        get_events(current_count, data)
 
     return data
 
 
-events = load_events()
+def sort_events_by_time(events: list) -> list:
+    """Sort events data by date and only return those after the current time."""
+    events.sort(key=itemgetter("start_datetime"))
+    for index, event in enumerate(events):
+        event_time = datetime.fromisoformat(event["start_datetime"])
+        if event_time > datetime.now():
+            events = events[index:]
+            break
+
+    return events
+
+
+data = get_events()
+events = sort_events_by_time(data)
+
+
 df = pd.DataFrame(events)
 
 
