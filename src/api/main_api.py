@@ -172,6 +172,8 @@ def create_user(user: User) -> User:
             session.add(user)
             session.commit()
             session.refresh(user)
+        else:
+            raise HTTPException(status_code=409, detail="User already exists.")
     return user
 
 
