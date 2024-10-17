@@ -11,51 +11,30 @@ st.write("Here are some upcoming events:")
 
 
 @st.cache_data(show_spinner=False)
-def get_events() -> list:
-    """Loads events based on todays date"""
-    current_count = 0
-    data = []
+def get_events(skip: int) -> list:
+    """Loads events sorted by start_datetime, starting with the current date"""
 
-    while True:
-        params = {"skip": current_count, "limit": MAX_EVENTS_LIMIT}
-        response = requests.get(url=EVENTS_API_URL + "/events", params=params)
-        response.raise_for_status()
+    params = {"skip": skip, "limit": MAX_EVENTS_LIMIT, "from_date": datetime.now()}
+    response = requests.get(url=EVENTS_API_URL + "/search_events/", params=params)
+    response.raise_for_status()
 
-        events = response.json()
-
-        if not events:
-            break
-
-        current_count += MAX_EVENTS_LIMIT
-        data.extend(events)
-
-    return data
-
-
-def sort_events_by_time(events: list) -> list:
-    """Sort events data by date and only return those after the current time."""
-    events.sort(key=itemgetter("start_datetime"))
-    for index, event in enumerate(events):
-        event_time = datetime.fromisoformat(event["start_datetime"])
-        if event_time > datetime.now():
-            events = events[index:]
-            break
+    events = response.json()
 
     return events
 
 
-# Load, sort, and convert events to DataFrame
-data = get_events()
-events = sort_events_by_time(data)
-df = pd.DataFrame(events)
-
 # Pagination controls
-total_events = len(df)
 events_per_page = 50
-total_pages = (total_events // events_per_page) + (total_events % events_per_page > 0)
 
 # Sidebar for pagination
-page_number = st.sidebar.number_input("Select Page:", 1, total_pages, 1)
+page_number = st.sidebar.number_input("Select Page:", 1, step=1)
+skip_count = (page_number - 1) * events_per_page
+
+# Load, sort, and convert events to DataFrame
+events_loaded = get_events(skip=skip_count)
+events_loaded.sort(key=itemgetter("start_datetime"))
+df = pd.DataFrame(events_loaded)
+
 start_index = (page_number - 1) * events_per_page
 end_index = start_index + events_per_page
 

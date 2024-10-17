@@ -75,18 +75,28 @@ def search_events(
     - **to_date**: Filter events till this date
     - **venue_keyword**: Search for events in the venue name.
     """
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=400, detail="from_date must be before to_date")
+    elif not from_date and to_date:
+        raise HTTPException(status_code=400, detail="must provide a from_date if to_date is provided.")
+
     with Session(engine) as session:
         statement = select(Event)
 
+        # Build the query filters
+        filters = []
         if from_date is not None:
-            statement = statement.where(Event.start_datetime >= from_date)
+            filters.append(Event.start_datetime >= from_date)
         if to_date is not None:
-            statement = statement.where(Event.start_datetime <= to_date)
-
+            filters.append(Event.start_datetime <= to_date)
         if venue_keyword is not None:
-            statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
+            filters.append(Event.venue.ilike(f"%{venue_keyword}%"))
         if category_keyword is not None:
-            statement = statement.where(Event.category.ilike(f"%{category_keyword}%"))
+            filters.append(Event.category.ilike(f"%{category_keyword}%"))
+
+        # Apply filters to the statement if there are any
+        if filters:
+            statement = statement.where(*filters)
 
         events = session.exec(statement).all()
         return events
