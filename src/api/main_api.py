@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, SQLModel, create_engine, select
 from datetime import datetime, timedelta
+from sqlalchemy import func
 from src.data.db_helper import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     authenticate_user,
@@ -61,7 +62,7 @@ def get_me(user: User = Depends(get_current_active_user)) -> User:
     return user
 
 
-@app.get("/search_events/", response_model=list[Event])
+@app.get("/search_events/", response_model=dict)
 def search_events(
     from_date: datetime | None = None,
     to_date: datetime | None = None,
@@ -77,7 +78,7 @@ def search_events(
     """
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=400, detail="from_date must be before to_date")
-    elif not from_date and to_date:
+    if not from_date and to_date:
         raise HTTPException(status_code=400, detail="must provide a from_date if to_date is provided.")
 
     with Session(engine) as session:
@@ -99,7 +100,10 @@ def search_events(
             statement = statement.where(*filters)
 
         events = session.exec(statement).all()
-        return events
+        count_statment = select(func.count(Event.id)).where(*filters)
+        total_events = session.exec(count_statment).one()
+
+        return {"total_events": total_events, "events": events}
 
 
 @app.get("/events/", response_model=list[Event])
