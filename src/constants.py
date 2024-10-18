@@ -12,7 +12,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 SECRET_KEY = config("SECRET_KEY")
 
-EVENTS_API_URL = config("EVENTS_API_URL", default="https://atx-events-api-7423eb0d8c65.herokuapp.com/")
+EVENTS_API_URL = config("EVENTS_API_URL", default="http://127.0.0.1:8000")
 MAX_EVENTS_LIMIT = 50
 
 PREDICT_API = config("PREDICT_API")

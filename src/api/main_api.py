@@ -168,16 +168,18 @@ def delete_event(event_id: int):
 
 @app.post("/users/", response_model=User)
 def create_user(user: User) -> User:
+    """Create User in DB, return Error if User already exists in database."""
     with Session(engine) as session:
         existing_user = session.exec(
             select(User).where(User.user_name == user.user_name, User.email == user.email)
         ).first()
-        if existing_user is None:
+        if existing_user:
+            raise HTTPException(status_code=409, detail="User already exists.")
+        else:
             session.add(user)
             session.commit()
             session.refresh(user)
-        else:
-            raise HTTPException(status_code=409, detail="User already exists.")
+
     return user
 
 
