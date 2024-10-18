@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, SQLModel, create_engine, select
 from datetime import datetime, timedelta
+from sqlalchemy import func
 from src.data.db_helper import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     authenticate_user,
@@ -50,16 +51,18 @@ def get_saved_events(current_user: User = Depends(get_current_active_user)):
         return events
 
 
-@app.get("/users/me/{user_id}", response_model=User)
+@app.get("/users/me/", response_model=User)
 def get_me(user: User = Depends(get_current_active_user)) -> User:
     with Session(engine) as session:
-        user = session.get(User, user.id)
+        user = session.get(User, user.user_name)
         if not user:
-            raise HTTPException(status_code=404, detail=f"User id {user.id} with username {user.user_name} not found")
+            raise HTTPException(
+                status_code=404, detail=f"User email {user.email} with username {user.user_name} not found"
+            )
     return user
 
 
-@app.get("/search_events/", response_model=list[Event])
+@app.get("/search_events/", response_model=dict)
 def search_events(
     from_date: datetime | None = None,
     to_date: datetime | None = None,
@@ -73,21 +76,34 @@ def search_events(
     - **to_date**: Filter events till this date
     - **venue_keyword**: Search for events in the venue name.
     """
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(status_code=400, detail="from_date must be before to_date")
+    if not from_date and to_date:
+        raise HTTPException(status_code=400, detail="must provide a from_date if to_date is provided.")
+
     with Session(engine) as session:
         statement = select(Event)
 
+        # Build the query filters
+        filters = []
         if from_date is not None:
-            statement = statement.where(Event.start_datetime >= from_date)
+            filters.append(Event.start_datetime >= from_date)
         if to_date is not None:
-            statement = statement.where(Event.start_datetime <= to_date)
-
+            filters.append(Event.start_datetime <= to_date)
         if venue_keyword is not None:
-            statement = statement.where(Event.venue.ilike(f"%{venue_keyword}%"))
+            filters.append(Event.venue.ilike(f"%{venue_keyword}%"))
         if category_keyword is not None:
-            statement = statement.where(Event.category.ilike(f"%{category_keyword}%"))
+            filters.append(Event.category.ilike(f"%{category_keyword}%"))
+
+        # Apply filters to the statement if there are any
+        if filters:
+            statement = statement.where(*filters)
 
         events = session.exec(statement).all()
-        return events
+        count_statment = select(func.count(Event.id)).where(*filters)
+        total_events = session.exec(count_statment).one()
+
+        return {"total_events": total_events, "events": events}
 
 
 @app.get("/events/", response_model=list[Event])
@@ -152,10 +168,18 @@ def delete_event(event_id: int):
 
 @app.post("/users/", response_model=User)
 def create_user(user: User) -> User:
+    """Create User in DB, return Error if User already exists in database."""
     with Session(engine) as session:
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+        existing_user = session.exec(
+            select(User).where(User.user_name == user.user_name, User.email == user.email)
+        ).first()
+        if existing_user:
+            raise HTTPException(status_code=409, detail="User already exists.")
+        else:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
     return user
 
 
