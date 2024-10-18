@@ -26,7 +26,6 @@ def get_events() -> list:
 def load_main_page():
     # Load page first time
     events_loaded = get_events()
-
     total_events = events_loaded["total_events"]
 
     # Calculate total pages
