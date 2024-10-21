@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 from alembic import context
 from src.constants import DATABASE_URL
 
-from src.data.db_models import User, Event, UserEventsAttended, UserEventsSaved, UserInDB, Token, TokenData
+from src.data.db_models import User, Event, UserEventsAttended, UserEventsSaved, Token, TokenData
 
 
 # this is the Alembic Config object, which provides

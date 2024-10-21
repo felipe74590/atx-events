@@ -18,6 +18,22 @@ def register_user(user_name, password, email):
 
 def login_user(user_name, password):
     """Login user into app."""
+    data = {"username": user_name, "password": password}
+    login_response = requests.post(EVENTS_API_URL + "/token", data=data)
+    print("Response Status:", login_response.status_code)
+    print("Response Content:", login_response.text)
+    if login_response.status_code == 200:
+        return login_response.json()
+    else:
+        st.error("Incorrect username or password.")
+        return None
+
+
+def get_user_details(token):
+    """Return user details of loggedin User."""
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(EVENTS_API_URL + "/users/me/", headers=headers)
+    return response.json() if response.status_code == 200 else None
 
 
 # Create tabs for registration and login
@@ -34,7 +50,6 @@ with tab1:
         if st.button("Register"):
             if register_user(reg_username, reg_password, reg_email):
                 st.session_state["registered"] = True
-                st.experimental_rerun()
 
 
 with tab2:
@@ -42,4 +57,13 @@ with tab2:
     login_username = st.text_input("Username", key="login_username")
     login_password = st.text_input("Password", type="password", key="login_password")
     if st.button("Login"):
-        login_user(login_username, login_password)
+        token_data = login_user(login_username, login_password)
+
+        if token_data:
+            token = token_data["access_token"]
+            st.session_state.token = token
+
+            user_details = get_user_details(token)
+            print(user_details, "PROFILE PAGE")
+            if user_details:
+                st.success(f"Logged in as {user_details['user_name']}")
