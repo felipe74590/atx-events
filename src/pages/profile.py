@@ -64,6 +64,7 @@ with tab2:
             st.session_state.token = token
 
             user_details = get_user_details(token)
-            print(user_details, "PROFILE PAGE")
             if user_details:
+                st.session_state.user_details = user_details
+                st.session_state["logged_in"] = True
                 st.success(f"Logged in as {user_details['user_name']}")

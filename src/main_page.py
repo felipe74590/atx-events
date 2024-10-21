@@ -43,6 +43,8 @@ def load_main_page():
     start_index = (page_number - 1) * events_per_page
     end_index = start_index + events_per_page
 
+    # Create a list to store saved events
+    saved_events = st.session_state.get("saved_events", [])
     for index, row in df.iloc[start_index:end_index].iterrows():
         dt = datetime.fromisoformat(row["start_datetime"])
         friendly_start_time = dt.strftime("%B %d, %Y, %I:%M %p")
@@ -50,7 +52,19 @@ def load_main_page():
         st.markdown(f"Venue: {row['venue']}")
         st.markdown(f"Starts:{friendly_start_time}")
         st.markdown(f"[Event Link]({row["event_link"]})")
+
+        event_id = row["id"]
+        is_saved = event_id in saved_events
+        if st.session_state.get("logged_in"):
+            if st.checkbox("Save Event", value=is_saved, key=event_id):
+                if event_id not in saved_events:
+                    saved_events.append(event_id)
+                else:
+                    if event_id in saved_events:
+                        saved_events.remove(event_id)
+
         st.markdown("--------------------")
+    st.session_state["saved_events"] = saved_events
 
 
 if __name__ == "__main__":
