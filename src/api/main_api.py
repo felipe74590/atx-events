@@ -52,10 +52,43 @@ def get_saved_events(current_user: User = Depends(get_current_active_user)):
         return events
 
 
+@app.post("/users/me/events/saved", response_model=UserEventsSaved)
+def save_event(save_event_request: dict, current_user: User = Depends(get_current_active_user)):
+    event_id = save_event_request["event_id"]
+    with Session(engine) as session:
+        query = select(UserEventsSaved).where(
+            UserEventsSaved.user_id == current_user.id, UserEventsSaved.event_id == event_id
+        )
+        check_event_saved = session.exec(query).first()
+        if check_event_saved:
+            raise HTTPException(status_code=409, detail="Event is already saved for this user.")
+        else:
+            new_saved_event = UserEventsSaved(user_id=current_user.id, event_id=event_id)
+            session.add(new_saved_event)
+            session.commit()
+            session.refresh(new_saved_event)
+        return {"detail": "Event saved successfully!", "saved_event": new_saved_event}
+
+
+@app.delete("/users/me/events/saved", response_model=UserEventsSaved)
+def remove_saved_event(save_event_request: dict, current_user: User = Depends(get_current_active_user)):
+    event_id = save_event_request["event_id"]
+    with Session(engine) as session:
+        query = select(UserEventsSaved).where(
+            UserEventsSaved.user_id == current_user.id, UserEventsSaved.event_id == event_id
+        )
+        check_event_saved = session.exec(query).first()
+        if not check_event_saved:
+            raise HTTPException(status_code=404, detail="Event is not currently saved for this user.")
+        else:
+            session.delete(check_event_saved)
+            session.commit()
+        return check_event_saved
+
+
 @app.get("/users/me/", response_model=User)
 def get_me(current_user: User = Depends(get_current_active_user)) -> User:
     with Session(engine) as session:
-        print(current_user.user_name)
         user = session.query(User).filter(User.user_name == current_user.user_name).first()
         if not user:
             raise HTTPException(

@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 from constants import EVENTS_API_URL
+from main_page import load_main_page
 
 st.write("My profile")
 
