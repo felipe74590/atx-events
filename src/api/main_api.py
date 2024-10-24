@@ -12,6 +12,7 @@ from src.data.db_helper import (
 from src.constants import DATABASE_URL
 
 from src.data.db_models import Event, User, Token, UserEventsAttended, UserEventsSaved
+from src.data.db_helper import get_password_hash
 
 app = FastAPI()
 
@@ -31,7 +32,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+        access_token = create_access_token(data={"sub": user.user_name}, expires_delta=access_token_expires)
         return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -51,13 +52,48 @@ def get_saved_events(current_user: User = Depends(get_current_active_user)):
         return events
 
 
-@app.get("/users/me/", response_model=User)
-def get_me(user: User = Depends(get_current_active_user)) -> User:
+@app.post("/users/me/events/saved", response_model=UserEventsSaved)
+def save_event(save_event_request: dict, current_user: User = Depends(get_current_active_user)):
+    event_id = save_event_request["event_id"]
     with Session(engine) as session:
-        user = session.get(User, user.user_name)
+        query = select(UserEventsSaved).where(
+            UserEventsSaved.user_id == current_user.id, UserEventsSaved.event_id == event_id
+        )
+        check_event_saved = session.exec(query).first()
+        if check_event_saved:
+            raise HTTPException(status_code=409, detail="Event is already saved for this user.")
+        else:
+            new_saved_event = UserEventsSaved(user_id=current_user.id, event_id=event_id)
+            session.add(new_saved_event)
+            session.commit()
+            session.refresh(new_saved_event)
+        return {"detail": "Event saved successfully!", "saved_event": new_saved_event}
+
+
+@app.delete("/users/me/events/saved", response_model=UserEventsSaved)
+def remove_saved_event(save_event_request: dict, current_user: User = Depends(get_current_active_user)):
+    event_id = save_event_request["event_id"]
+    with Session(engine) as session:
+        query = select(UserEventsSaved).where(
+            UserEventsSaved.user_id == current_user.id, UserEventsSaved.event_id == event_id
+        )
+        check_event_saved = session.exec(query).first()
+        if not check_event_saved:
+            raise HTTPException(status_code=404, detail="Event is not currently saved for this user.")
+        else:
+            session.delete(check_event_saved)
+            session.commit()
+        return check_event_saved
+
+
+@app.get("/users/me/", response_model=User)
+def get_me(current_user: User = Depends(get_current_active_user)) -> User:
+    with Session(engine) as session:
+        user = session.query(User).filter(User.user_name == current_user.user_name).first()
         if not user:
             raise HTTPException(
-                status_code=404, detail=f"User email {user.email} with username {user.user_name} not found"
+                status_code=404,
+                detail=f"User email {current_user.email} with username {current_user.user_name} not found",
             )
     return user
 
@@ -160,10 +196,22 @@ def delete_event(event_id: int):
     with Session(engine) as session:
         event = session.get(Event, event_id)
         if not event:
-            raise HTTPException(status_code=404, detail="Event not found")
+            raise HTTPException(status_code=404, detail="Event not found.")
         session.delete(event)
         session.commit()
     return event
+
+
+@app.delete("/users/{user_id}", response_model=User)
+def delete_user(user_id: int):
+    """Remove user from database."""
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        session.delete(user)
+        session.commit()
+    return user
 
 
 @app.post("/users/", response_model=User)
@@ -176,11 +224,15 @@ def create_user(user: User) -> User:
         if existing_user:
             raise HTTPException(status_code=409, detail="User already exists.")
         else:
-            session.add(user)
+            hashed_password = get_password_hash(user.password)
+            new_user = User(
+                user_name=user.user_name, email=user.email, password=user.password, hashed_password=hashed_password
+            )
+            session.add(new_user)
             session.commit()
-            session.refresh(user)
+            session.refresh(new_user)
 
-    return user
+    return new_user
 
 
 @app.get("/user/{user_id}", response_model=User)

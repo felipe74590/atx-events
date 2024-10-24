@@ -1,7 +1,7 @@
 from sqlmodel import Session, SQLModel, create_engine, select
-from src.data.db_models import Event, UserInDB, User, TokenData
+from src.data.db_models import Event, User, TokenData
 from src.constants import DATABASE_URL, SECRET_KEY
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -45,7 +45,7 @@ def authenticate_user(session, username: str, password: str):
     user = session.exec(query).first()
     if not user:
         return False
-    if not verify_password(password, user.hash_password):
+    if not verify_password(password, user.hashed_password):
         return False
     return user
 
@@ -53,16 +53,16 @@ def authenticate_user(session, username: str, password: str):
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(datetime.UTC) + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(datetime.UTC) + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     to_encode.update({"exp": expire})
     encode_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encode_jwt
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
     credential_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials.",
@@ -79,13 +79,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credential_exception
 
-    user = get_user_by_username(username=token_data.username)
+    user = get_user_by_username(session, username=token_data.username)
+
     if user is None:
         raise credential_exception
     return user
 
 
-async def get_current_active_user(current_user: UserInDB = Depends(get_current_user)):
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
     if not current_user.active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user

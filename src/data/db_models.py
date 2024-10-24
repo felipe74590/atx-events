@@ -28,6 +28,7 @@ class UserBase(SQLModel):
     user_name: str
     email: str
     password: str
+    hashed_password: str
 
 
 class User(UserBase, table=True):
@@ -44,7 +45,3 @@ class Token(SQLModel):
 
 class TokenData(SQLModel):
     username: str | None = None
-
-
-class UserInDB(UserBase):
-    hashed_password: str
