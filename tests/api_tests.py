@@ -1,14 +1,36 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
-import json
 from datetime import datetime
-from src.api.main_api import app
-from src.data.db_helper import get_current_active_user
-from src.data.db_models import User, Event, UserEventsSaved, Token
-from src.data.db_helper import ACCESS_TOKEN_EXPIRE_MINUTES
+import json
+from unittest.mock import patch, MagicMock
 
-client = TestClient(app)
+import pytest
+from fastapi.testclient import TestClient
+from sqlmodel import Session, SQLModel, create_engine
+from sqlalchemy.pool import StaticPool
+
+from src.api.main_api import app
+from src.data.db_helper import get_current_active_user, get_session
+from src.data.db_models import User, Event, UserEventsSaved
+
+
+@pytest.fixture(name="session")
+def session_fixture():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+
+
+@pytest.fixture(name="client")
+def client_fixture(session: Session):
+    def get_session_override():
+        return session
+
+    app.dependency_overrides[get_session] = get_session_override
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
 
 
 # Mock the form data class to simulate OAuth2PasswordRequestForm input
@@ -19,7 +41,7 @@ class MockOAuth2PasswordRequestForm:
 
 
 # Test function to handle the login endpoint
-def test_login_for_access_token_success():
+def test_login_for_access_token_success(client):
     mock_user = User(id=1, user_name="testuser", password_hash="hashed_password")
     mock_access_token = "mocked_access_token"
 
@@ -37,7 +59,7 @@ def test_login_for_access_token_success():
             assert token_data["token_type"] == "bearer"
 
 
-def test_login_for_access_token_failure():
+def test_login_for_access_token_failure(client):
     # Mock authenticate_user to return None (invalid user)
     with patch("src.api.main_api.authenticate_user", return_value=None):
         form_data = MockOAuth2PasswordRequestForm(username="invaliduser", password="wrongpassword")
@@ -58,7 +80,7 @@ def mock_execute_query(session, user_id):
     return mock_query_result
 
 
-def test_get_saved_events():
+def test_get_saved_events(client):
     app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
         with patch("sqlmodel.Session.exec") as mock_exec:
@@ -71,7 +93,7 @@ def test_get_saved_events():
             assert events[0]["title"] == "Event 1"
 
 
-def test_get_attended_events():
+def test_get_attended_events(client):
     app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
         with patch("sqlmodel.Session.exec") as mock_exec:
@@ -84,7 +106,7 @@ def test_get_attended_events():
             assert events[0]["title"] == "Event 1"
 
 
-def test_save_event_success():
+def test_save_event_success(client):
     save_event_request = {"event_id": 101}
     mock_saved_event = UserEventsSaved(user_id=1, event_id=101)
 
@@ -109,7 +131,7 @@ def test_save_event_success():
             assert response_data["event_id"] == 101
 
 
-def test_save_event_already_saved():
+def test_save_event_already_saved(client):
     save_event_request = {"event_id": 101}
 
     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
@@ -124,7 +146,7 @@ def test_save_event_already_saved():
             assert response.json()["detail"] == "Event is already saved for this user."
 
 
-def test_get_me_success():
+def test_get_me_success(client):
     mock_user = User(id=1, user_name="testuser", email="testuser@example.com")
 
     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
@@ -140,7 +162,7 @@ def test_get_me_success():
 
 
 # Test when the user is not found
-def test_get_me_not_found():
+def test_get_me_not_found(client):
     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
         with patch("sqlmodel.Session.query") as mock_query:
             mock_query.return_value.filter.return_value.first.return_value = None
@@ -158,37 +180,35 @@ def mock_event_data():
     ]
 
 
-# Test for successful search with filters
-# def test_search_events_success():
-#     # Mock the session and query response
-#     with patch("src.api.main_api.Session") as mock_session:
-#         mock_instance = mock_session.return_value  # Get the mocked session instance
-#         mock_instance.exec.side_effect = [mock_event_data(), 2]  # Return mock events and total count
+def test_search_events_success(client):
+    # Mock the session and query response
+    with patch("src.api.main_api.Session") as mock_session:
+        mock_instance = mock_session.return_value  # Get the mocked session instance
+        mock_instance.exec.side_effect = [mock_event_data(), 2]  # Return mock events and total count
 
-#         from_date = datetime(2024, 10, 24)
-#         to_date = datetime(2024, 10, 27)
-#         venue_keyword = "Venue"
-#         category_keyword = "Music"
+        from_date = datetime(2024, 10, 24)
+        to_date = datetime(2024, 10, 27)
+        venue_keyword = "Venue"
+        category_keyword = "Music"
 
-#         response = client.get("/search_events/", params={
-#             "from_date": from_date.isoformat(),
-#             "to_date": to_date.isoformat(),
-#             "venue_keyword": venue_keyword,
-#             "category_keyword": category_keyword
-#         })
+        response = client.get("/search_events/", params={
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+            "venue_keyword": venue_keyword,
+            "category_keyword": category_keyword
+        })
 
-#         assert response.status_code == 200
-#         assert response.json() == {
-#             "total_events": 2,
-#             "events": [
-#                 {"id": 1, "start_datetime": "2024-10-25T10:00:00", "venue": "Venue A", "category": "Music"},
-#                 {"id": 2, "start_datetime": "2024-10-26T10:00:00", "venue": "Venue B", "category": "Art"},
-#             ]
-#         }
+        assert response.status_code == 200
+        assert response.json() == {
+            "total_events": 2,
+            "events": [
+                {"id": 1, "start_datetime": "2024-10-25T10:00:00", "venue": "Venue A", "category": "Music"},
+                {"id": 2, "start_datetime": "2024-10-26T10:00:00", "venue": "Venue B", "category": "Art"},
+            ]
+        }
 
 
-# Test for validation error when from_date is after to_date
-def test_search_events_invalid_date_range():
+def test_search_events_invalid_date_range(client):
     from_date = datetime(2024, 10, 26)
     to_date = datetime(2024, 10, 25)
 
@@ -204,8 +224,7 @@ def test_search_events_invalid_date_range():
     assert response.json()["detail"] == "from_date must be before to_date"
 
 
-# Test for validation error when to_date is provided without from_date
-def test_search_events_missing_from_date():
+def test_search_events_missing_from_date(client):
     to_date = datetime(2024, 10, 25)
 
     response = client.get(
@@ -219,53 +238,49 @@ def test_search_events_missing_from_date():
     assert response.json()["detail"] == "must provide a from_date if to_date is provided."
 
 
-# # Test for no events found
-# def test_search_events_no_results():
-#     with patch("src.api.main_api.Session.exec") as mock_exec:
-#         mock_exec.side_effect = [[], 0]  # No events, count of 0
+def test_search_events_no_results(client):
+    from_date = datetime(2024, 10, 24)
+    to_date = datetime(2024, 10, 27)
 
-#         from_date = datetime(2024, 10, 24)
-#         to_date = datetime(2024, 10, 27)
+    response = client.get("/search_events/", params={
+        "from_date": from_date.isoformat(),
+        "to_date": to_date.isoformat(),
+    })
 
-#         response = client.get("/search_events/", params={
-#             "from_date": from_date.isoformat(),
-#             "to_date": to_date.isoformat(),
-#         })
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_events": 0,
+        "events": []
+    }
 
-#         assert response.status_code == 200
-#         assert response.json() == {
-#             "total_events": 0,
-#             "events": []
-#         }
+def test_remove_saved_event_success(client):
+    save_event_request = {"event_id": 101}
+    mock_saved_event = UserEventsSaved(user_id=1, event_id=101)
 
-# def test_remove_saved_event_success():
-#     save_event_request = {"event_id": 101}
-#     mock_saved_event = UserEventsSaved(user_id=1, event_id=101)
+    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
+        with patch("sqlmodel.Session.exec") as mock_exec, patch("sqlmodel.Session.delete") as mock_delete, patch("sqlmodel.Session.commit"):
+            # Mock the query to return the saved event (meaning the event is currently saved)
+            mock_exec.return_value.first.return_value = mock_saved_event
 
-#     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-#         with patch("sqlmodel.Session.exec") as mock_exec, patch("sqlmodel.Session.delete") as mock_delete, patch("sqlmodel.Session.commit"):
-#             # Mock the query to return the saved event (meaning the event is currently saved)
-#             mock_exec.return_value.first.return_value = mock_saved_event
+            mock_delete.return_value = None
 
-#             mock_delete.return_value = None
+            response = client.delete("/me/events/saved", json=json.dumps(save_event_request))
 
-#             response = client.delete("/me/events/saved", json=json.dumps(save_event_request))
+            assert response.status_code == 200
+            response_data = response.json()
+            assert response_data["user_id"] == 1
+            assert response_data["event_id"] == 101
 
-#             assert response.status_code == 200
-#             response_data = response.json()
-#             assert response_data["user_id"] == 1
-#             assert response_data["event_id"] == 101
 
-# # Test when the event is not found (not saved for the user)
-# def test_remove_saved_event_not_found():
-#     save_event_request = {"event_id": 101}
+def test_remove_saved_event_not_found(client):
+    save_event_request = {"event_id": 101}
 
-#     with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-#         with patch("sqlmodel.Session.exec") as mock_exec:
-#             # Mock the query to return None (meaning the event is not saved for the user)
-#             mock_exec.return_value.first.return_value = None
+    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
+        with patch("sqlmodel.Session.exec") as mock_exec:
+            # Mock the query to return None (meaning the event is not saved for the user)
+            mock_exec.return_value.first.return_value = None
 
-#             response = client.delete("/me/events/saved", json=save_event_request)
+            response = client.delete("/me/events/saved", json=save_event_request)
 
-#             assert response.status_code == 400
-#             assert response.json()["detail"] == "Event is not currently saved for this user."
+            assert response.status_code == 400
+            assert response.json()["detail"] == "Event is not currently saved for this user."
