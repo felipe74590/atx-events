@@ -27,6 +27,7 @@ dependencies = [
 dev-dependencies = [
     "pgcli>=4.1.0",
     "psycopg2-binary>=2.9.9",
+    "pytest>=8.3.3",
     "ruff>=0.6.6",
 ]
 

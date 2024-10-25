@@ -36,23 +36,23 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/users/me/events/attended", response_model=User)
+@app.get("/me/events/attended", response_model=list[Event])
 def get_attended_events(current_user: User = Depends(get_current_active_user)):
     with Session(engine) as session:
         query = select(Event).where(UserEventsAttended.user_id == current_user.id)
-        events = session.exec(query).all
+        events = session.exec(query).all()
         return events
 
 
-@app.get("/users/me/events/saved", response_model=User)
+@app.get("/me/events/saved", response_model=list[Event])
 def get_saved_events(current_user: User = Depends(get_current_active_user)):
     with Session(engine) as session:
         query = select(Event).where(UserEventsSaved.user_id == current_user.id)
-        events = session.exec(query).all
+        events = session.exec(query).all()
         return events
 
 
-@app.post("/users/me/events/saved", response_model=UserEventsSaved)
+@app.post("/me/events/saved", response_model=UserEventsSaved)
 def save_event(save_event_request: dict, current_user: User = Depends(get_current_active_user)):
     event_id = save_event_request["event_id"]
     with Session(engine) as session:
@@ -67,10 +67,10 @@ def save_event(save_event_request: dict, current_user: User = Depends(get_curren
             session.add(new_saved_event)
             session.commit()
             session.refresh(new_saved_event)
-        return {"detail": "Event saved successfully!", "saved_event": new_saved_event}
+        return new_saved_event
 
 
-@app.delete("/users/me/events/saved", response_model=UserEventsSaved)
+@app.delete("/me/events/saved", response_model=UserEventsSaved)
 def remove_saved_event(save_event_request: dict, current_user: User = Depends(get_current_active_user)):
     event_id = save_event_request["event_id"]
     with Session(engine) as session:
