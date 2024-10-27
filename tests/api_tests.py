@@ -14,9 +14,7 @@ from src.data.db_models import User, Event, UserEventsSaved
 
 @pytest.fixture(name="session")
 def session_fixture():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
@@ -99,7 +97,7 @@ def test_get_attended_events(client):
         with patch("sqlmodel.Session.exec") as mock_exec:
             mock_exec.return_value = mock_execute_query(None, 1)
             response = client.get("/me/events/attended")
-            print(response)
+
             assert response.status_code == 200
             events = response.json()
             assert len(events) == 1
@@ -109,103 +107,112 @@ def test_get_attended_events(client):
 def test_save_event_success(client):
     save_event_request = {"event_id": 101}
     mock_saved_event = UserEventsSaved(user_id=1, event_id=101)
+    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
 
-    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-        with (
-            patch("sqlmodel.Session.exec") as mock_exec,
-            patch("sqlmodel.Session.add") as mock_add,
-            patch("sqlmodel.Session.commit"),
-            patch("sqlmodel.Session.refresh") as mock_refresh,
-        ):
-            # Mock the query to return None (meaning event is not already saved)
-            mock_exec.return_value.first.return_value = None
+    with (
+        patch("sqlmodel.Session.exec") as mock_exec,
+        patch("sqlmodel.Session.commit"),
+        patch("sqlmodel.Session.refresh") as mock_refresh,
+    ):
+        mock_exec.return_value.first.side_effect = lambda: None
+        mock_refresh.return_value = mock_saved_event
 
-            mock_add.return_value = None
-            mock_refresh.return_value = mock_saved_event
+        response = client.post("/me/events/saved", json=save_event_request)
 
-            response = client.post("/me/events/saved", json=save_event_request)
+        assert response.status_code == 200
 
-            assert response.status_code == 200
-            response_data = response.json()
-            assert response_data["user_id"] == 1
-            assert response_data["event_id"] == 101
+        response_data = response.json()
+        assert response_data["user_id"] == 1
+        assert response_data["event_id"] == 101
+    # Clear the overrides to avoid affecting other tests
+    app.dependency_overrides.clear()
 
 
 def test_save_event_already_saved(client):
     save_event_request = {"event_id": 101}
+    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
+    with patch("sqlmodel.Session.exec") as mock_exec:
+        mock_exec.return_value.first.return_value = UserEventsSaved(user_id=1, event_id=101)
 
-    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-        with patch("sqlmodel.Session.exec") as mock_exec:
-            # Mock the query to return a UserEventsSaved instance, meaning the event is already saved
-            mock_exec.return_value.first.return_value = UserEventsSaved(user_id=1, event_id=101)
+        response = client.post("/me/events/saved", json=save_event_request)
 
-            response = client.post("/me/events/saved", json=save_event_request)
-            print(response.json())
-
-            assert response.status_code == 409
-            assert response.json()["detail"] == "Event is already saved for this user."
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Event is already saved for this user."
 
 
 def test_get_me_success(client):
     mock_user = User(id=1, user_name="testuser", email="testuser@example.com")
 
-    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-        with patch("sqlmodel.Session.query") as mock_query:
-            mock_query.return_value.filter.return_value.first.return_value = mock_user
+    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
+    with patch("sqlmodel.Session.query") as mock_query:
+        mock_query.return_value.filter.return_value.first.return_value = mock_user
 
-            response = client.get("/users/me/")
+        response = client.get("/users/me/")
 
-            assert response.status_code == 200
-            response_data = response.json()
-            assert response_data["user_name"] == "testuser"
-            assert response_data["email"] == "testuser@example.com"
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["user_name"] == "testuser"
+        assert response_data["email"] == "testuser@example.com"
 
 
 # Test when the user is not found
 def test_get_me_not_found(client):
-    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-        with patch("sqlmodel.Session.query") as mock_query:
-            mock_query.return_value.filter.return_value.first.return_value = None
+    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
+    with patch("sqlmodel.Session.query") as mock_query:
+        mock_query.return_value.filter.return_value.first.return_value = None
 
-            response = client.get("/users/me/")
+        response = client.get("/users/me/")
 
-            assert response.status_code == 404
-            assert response.json()["detail"] == "User email test@gmail.com with username testuser not found"
+        assert response.status_code == 404
+        assert response.json()["detail"] == "User email test@gmail.com with username testuser not found"
 
 
 def mock_event_data():
-    return [
-        Event(id=1, start_datetime=datetime(2024, 10, 25, 10, 0), venue="Venue A", category="Music"),
-        Event(id=2, start_datetime=datetime(2024, 10, 26, 10, 0), venue="Venue B", category="Art"),
+    return
+
+
+def insert_mock_events(session: Session):
+    events = [
+        Event(id=1, title="party", start_datetime=datetime(2024, 10, 25, 10, 0), venue="Venue A", category="Music"),
+        Event(id=2, title="concert", start_datetime=datetime(2024, 10, 26, 10, 0), venue="Venue B", category="Art"),
     ]
+    session.add_all(events)
+    session.commit()
 
 
-def test_search_events_success(client):
+def test_search_events_success(client, session):
     # Mock the session and query response
-    with patch("src.api.main_api.Session") as mock_session:
-        mock_instance = mock_session.return_value  # Get the mocked session instance
-        mock_instance.exec.side_effect = [mock_event_data(), 2]  # Return mock events and total count
+    insert_mock_events(session)
 
-        from_date = datetime(2024, 10, 24)
-        to_date = datetime(2024, 10, 27)
-        venue_keyword = "Venue"
-        category_keyword = "Music"
+    from_date = datetime(2024, 10, 24)
+    to_date = datetime(2024, 10, 27)
+    venue_keyword = "Venue"
+    category_keyword = "Music"
 
-        response = client.get("/search_events/", params={
+    response = client.get(
+        "/search_events/",
+        params={
             "from_date": from_date.isoformat(),
             "to_date": to_date.isoformat(),
             "venue_keyword": venue_keyword,
-            "category_keyword": category_keyword
-        })
+            "category_keyword": category_keyword,
+        },
+    )
 
-        assert response.status_code == 200
-        assert response.json() == {
-            "total_events": 2,
-            "events": [
-                {"id": 1, "start_datetime": "2024-10-25T10:00:00", "venue": "Venue A", "category": "Music"},
-                {"id": 2, "start_datetime": "2024-10-26T10:00:00", "venue": "Venue B", "category": "Art"},
-            ]
-        }
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_events": 1,
+        "events": [
+            {
+                "id": 1,
+                "start_datetime": "2024-10-25T10:00:00",
+                "venue": "Venue A",
+                "category": "Music",
+                "event_link": None,
+                "title": "party",
+            },
+        ],
+    }
 
 
 def test_search_events_invalid_date_range(client):
@@ -242,45 +249,55 @@ def test_search_events_no_results(client):
     from_date = datetime(2024, 10, 24)
     to_date = datetime(2024, 10, 27)
 
-    response = client.get("/search_events/", params={
-        "from_date": from_date.isoformat(),
-        "to_date": to_date.isoformat(),
-    })
+    response = client.get(
+        "/search_events/",
+        params={
+            "from_date": from_date.isoformat(),
+            "to_date": to_date.isoformat(),
+        },
+    )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "total_events": 0,
-        "events": []
-    }
+    assert response.json() == {"total_events": 0, "events": []}
 
-def test_remove_saved_event_success(client):
+
+class CustomTestClient(TestClient):
+    def delete_with_payload(self, url: str, **kwargs):
+        return self.request(method="DELETE", url=url, **kwargs)
+
+
+def test_remove_saved_event_success():
     save_event_request = {"event_id": 101}
     mock_saved_event = UserEventsSaved(user_id=1, event_id=101)
 
-    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-        with patch("sqlmodel.Session.exec") as mock_exec, patch("sqlmodel.Session.delete") as mock_delete, patch("sqlmodel.Session.commit"):
-            # Mock the query to return the saved event (meaning the event is currently saved)
-            mock_exec.return_value.first.return_value = mock_saved_event
+    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
+    with (
+        patch("sqlmodel.Session.exec") as mock_exec,
+        patch("sqlmodel.Session.delete") as mock_delete,
+        patch("sqlmodel.Session.commit"),
+    ):
+        # Mock the query to return the saved event (meaning the event is currently saved)
+        mock_exec.return_value.first.return_value = mock_saved_event
 
-            mock_delete.return_value = None
+        mock_delete.return_value = None
+        client = CustomTestClient(app)
+        response = client.delete_with_payload("/me/events/saved", json=save_event_request)
 
-            response = client.delete("/me/events/saved", json=json.dumps(save_event_request))
-
-            assert response.status_code == 200
-            response_data = response.json()
-            assert response_data["user_id"] == 1
-            assert response_data["event_id"] == 101
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["user_id"] == 1
+        assert response_data["event_id"] == 101
 
 
-def test_remove_saved_event_not_found(client):
+def test_remove_saved_event_not_found():
     save_event_request = {"event_id": 101}
+    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
+    with patch("sqlmodel.Session.exec") as mock_exec:
+        # Mock the query to return None (meaning the event is not saved for the user)
+        mock_exec.return_value.first.return_value = None
 
-    with patch("src.api.main_api.get_current_active_user", mock_get_current_active_user):
-        with patch("sqlmodel.Session.exec") as mock_exec:
-            # Mock the query to return None (meaning the event is not saved for the user)
-            mock_exec.return_value.first.return_value = None
+        client = CustomTestClient(app)
+        response = client.delete_with_payload("/me/events/saved", json=save_event_request)
 
-            response = client.delete("/me/events/saved", json=save_event_request)
-
-            assert response.status_code == 400
-            assert response.json()["detail"] == "Event is not currently saved for this user."
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Event is not currently saved for this user."

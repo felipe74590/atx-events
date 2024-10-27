@@ -33,7 +33,7 @@ def login_user(user_name, password):
 def get_user_details(token):
     """Return user details of loggedin User."""
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(EVENTS_API_URL + "/me/", headers=headers)
+    response = requests.get(EVENTS_API_URL + "/users/me/", headers=headers)
     return response.json() if response.status_code == 200 else None
 
 
