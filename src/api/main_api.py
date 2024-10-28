@@ -15,12 +15,16 @@ from src.data.db_helper import get_password_hash, get_session, create_db_and_tab
 
 app = FastAPI()
 
+
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
 
+
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)
+):
     user = authenticate_user(session, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -34,20 +38,14 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 
 @app.get("/me/events/attended", response_model=list[Event])
-def get_attended_events(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user)
-):
+def get_attended_events(session: Session = Depends(get_session), current_user: User = Depends(get_current_active_user)):
     query = select(Event).where(UserEventsAttended.user_id == current_user.id)
     events = session.exec(query).all()
     return events
 
 
 @app.get("/me/events/saved", response_model=list[Event])
-def get_saved_events(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user)
-):
+def get_saved_events(session: Session = Depends(get_session), current_user: User = Depends(get_current_active_user)):
     query = select(Event).where(UserEventsSaved.user_id == current_user.id)
     events = session.exec(query).all()
     return events
@@ -57,7 +55,7 @@ def get_saved_events(
 def save_event(
     save_event_request: dict,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     event_id = save_event_request["event_id"]
     query = select(UserEventsSaved).where(
@@ -78,7 +76,7 @@ def save_event(
 def remove_saved_event(
     save_event_request: dict,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     event_id = save_event_request["event_id"]
     query = select(UserEventsSaved).where(
@@ -94,10 +92,7 @@ def remove_saved_event(
 
 
 @app.get("/users/me/", response_model=User)
-def get_me(
-    current_user: User = Depends(get_current_active_user),
-    session: Session = Depends(get_session)
-) -> User:
+def get_me(current_user: User = Depends(get_current_active_user), session: Session = Depends(get_session)) -> User:
     user = session.query(User).filter(User.user_name == current_user.user_name).first()
     if not user:
         raise HTTPException(
@@ -152,11 +147,7 @@ def search_events(
 
 
 @app.get("/events/", response_model=list[Event])
-def read_events(
-    skip: int = 0,
-    limit: int = 50,
-    session: Session = Depends(get_session)
-) -> list[Event]:
+def read_events(skip: int = 0, limit: int = 50, session: Session = Depends(get_session)) -> list[Event]:
     """
     Get all events.
     - **limit**: Maximum number of records to return.
@@ -191,7 +182,8 @@ def create_event(
 
 @app.patch("/events/{event_id}", response_model=Event)
 def update_event(
-    event_id: int, event: Event,
+    event_id: int,
+    event: Event,
     session: Session = Depends(get_session),
 ) -> Event:
     db_event = session.get(Event, event_id)
@@ -207,7 +199,10 @@ def update_event(
 
 
 @app.delete("/events/{event_id}", response_model=Event)
-def delete_event(event_id: int, session: Session = Depends(get_session),):
+def delete_event(
+    event_id: int,
+    session: Session = Depends(get_session),
+):
     event = session.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found.")
@@ -230,9 +225,7 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
 @app.post("/users/", response_model=User)
 def create_user(user: User, session: Session = Depends(get_session)) -> User:
     """Create User in DB, return Error if User already exists in database."""
-    existing_user = session.exec(
-        select(User).where(User.user_name == user.user_name, User.email == user.email)
-    ).first()
+    existing_user = session.exec(select(User).where(User.user_name == user.user_name, User.email == user.email)).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists.")
     else:
@@ -247,17 +240,18 @@ def create_user(user: User, session: Session = Depends(get_session)) -> User:
     return new_user
 
 
-@app.get("/user/{user_id}", response_model=User)
-def get_user(user: User, session: Session = Depends(get_session)) -> User:
-    user = session.get(User, user.id)
+@app.get("/users/{user_id}", response_model=User)
+def get_user(user_id: int, session: Session = Depends(get_session)) -> User:
+    user = session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail=f"User id {user.id} with username {user.user_name} not found")
+        raise HTTPException(status_code=404, detail=f"User id {user_id} not found")
     return user
 
 
 @app.get("/users/", response_model=list[User])
 def get_users(
-    skip: int = 0, limit: int = 50,
+    skip: int = 0,
+    limit: int = 50,
     session: Session = Depends(get_session),
 ) -> list[User]:
     """

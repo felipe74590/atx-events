@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
+from sqlalchemy import text
 from sqlalchemy.pool import StaticPool
 
 from src.api.main_api import app
@@ -167,10 +168,6 @@ def test_get_me_not_found(client):
         assert response.json()["detail"] == "User email test@gmail.com with username testuser not found"
 
 
-def mock_event_data():
-    return
-
-
 def insert_mock_events(session: Session):
     events = [
         Event(id=1, title="party", start_datetime=datetime(2024, 10, 25, 10, 0), venue="Venue A", category="Music"),
@@ -301,3 +298,81 @@ def test_remove_saved_event_not_found():
 
         assert response.status_code == 404
         assert response.json()["detail"] == "Event is not currently saved for this user."
+
+
+def test_read_events_no_events(client):
+    response = client.get("/events/")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_read_events(client, session):
+    insert_mock_events(session)
+    response = client.get("/events/")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_read_event(client, session):
+    insert_mock_events(session)
+    event_id = 1
+    response = client.get(f"/events/{event_id}")
+
+    assert response.status_code == 200
+    assert response.json()["title"] == "party"
+    assert response.json()["venue"] == "Venue A"
+
+
+def test_fail_read_event(client):
+    # not inserting events in database, so it should be empty
+    event_id = 1
+    response = client.get(f"/events/{event_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Event not found"
+
+
+def insert_mock_users(session: Session):
+    users = [
+        User(id=1, user_name="testuser", email="test@gmail.com", password="testpassword", hashed_password="xxxxx---"),
+        User(
+            id=2, user_name="testuser2", email="test2@gmail.com", password="test2password", hashed_password="xxxxx---"
+        ),
+    ]
+    session.add_all(users)
+    session.commit()
+
+
+def test_read_user_no_users(client):
+    response = client.get("/users/")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_read_users(client, session):
+    insert_mock_users(session)
+    response = client.get("/users/")
+
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_read_user(client, session):
+    insert_mock_users(session)
+    user_id = 1
+    response = client.get(f"/users/{user_id}")
+
+    assert response.status_code == 200
+    assert response.json()["user_name"] == "testuser"
+    assert response.json()["email"] == "test@gmail.com"
+
+
+def test_fail_user_event(client):
+    # not inserting events in database, so it should be empty
+    user_id = 1
+    response = client.get(f"/users/{user_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "User id 1 not found"
