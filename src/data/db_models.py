@@ -1,6 +1,7 @@
-from sqlmodel import Field, SQLModel, Relationship
 from typing import List
 from datetime import datetime
+
+from sqlmodel import Field, SQLModel, Relationship
 
 
 class UserEventsAttended(SQLModel, table=True):

@@ -27,7 +27,7 @@ def user_saved_events(event_id: int, token: str):
     """Updates user saved events into database."""
     data = {"event_id": event_id}
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    response = requests.post(url=EVENTS_API_URL + "/users/me/events/saved", json=data, headers=headers)
+    response = requests.post(url=EVENTS_API_URL + "/me/events/saved", json=data, headers=headers)
     if response.status_code == 200:
         print("Event successfully saved.")
     elif response.status_code == 409:
@@ -42,7 +42,7 @@ def user_unsaved_events(event_id: int, token: str):
     """Removes unsaved events from user info in database."""
     data = {"event_id": event_id}
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    response = requests.delete(url=EVENTS_API_URL + "/users/me/events/saved", json=data, headers=headers)
+    response = requests.delete(url=EVENTS_API_URL + "/me/events/saved", json=data, headers=headers)
     print(response.json())
 
 
